@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>بيانات الشحن — العز للعود</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main style="max-width:560px">
+  <div class="panel" id="box">
+    <h2>العز للعود</h2>
+    <p class="muted" id="msg" style="margin:0">جاري التحميل…</p>
+  </div>
+  <div class="panel" id="form" hidden>
+    <h3>بيانات الشحن</h3>
+    <div class="field"><label for="rcv_name">اسم المستلم</label><input type="text" id="rcv_name" autocomplete="name"></div>
+    <div class="field"><label for="rcv_phone">جوال المستلم</label><input type="tel" id="rcv_phone" dir="ltr" autocomplete="tel"></div>
+    <div class="field"><label for="country">الدولة</label><input type="text" id="country" value="السعودية"></div>
+    <div class="field"><label for="rcv_city">المدينة</label><input type="text" id="rcv_city"></div>
+    <div class="field"><label for="address">الحي والشارع</label><textarea id="address"></textarea></div>
+    <div class="field"><label for="short_code">الرمز المختصر للعنوان الوطني (مثال: RRRD2929)</label><input type="text" id="short_code" dir="ltr"></div>
+    <div id="bankWrap" hidden style="display:grid;gap:12px">
+      <h3>الحساب البنكي للتحويل</h3>
+      <div class="note">بياناتك البنكية تتشفّر على جهازك قبل الإرسال، وما يقدر يقرأها إلا مدير التسويق.</div>
+      <div class="field"><label for="holder">اسم صاحب الحساب</label><input type="text" id="holder"></div>
+      <div class="field"><label for="bank">البنك</label><input type="text" id="bank"></div>
+      <div class="field"><label for="iban">رقم الآيبان (IBAN)</label><input type="text" id="iban" dir="ltr" placeholder="SA..."></div>
+    </div>
+    <button class="btn primary" id="send" type="button">إرسال</button>
+  </div>
+</main>
+<div id="toast" class="toast" hidden role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="assets/config.js"></script>
+<script>
+(async function(){
+  const C = window.APP_CONFIG, sb = supabase.createClient(C.supabaseUrl, C.supabaseKey);
+  const $ = id => document.getElementById(id), token = new URLSearchParams(location.search).get('t') || '';
+  const say = t => { $('msg').textContent = t; };
+  const b64 = buf => { const a = new Uint8Array(buf); let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); };
+  const { data, error } = await sb.rpc('intake_get', { p_token: token });
+  if (error || !data) return say('الرابط غير صحيح أو انتهى. تواصل مع الموظف اللي أرسله لك.');
+  say(`هلا ${data.name}، نورتنا. عبّ بياناتك تحت عشان نشحن لك${data.campaign ? ' منتج حملة «' + data.campaign + '»' : ''}.`);
+  if (data.done) say(`شكراً ${data.name}، بياناتك وصلتنا. إذا تبي تعدّلها عبّها مرة ثانية وأرسل.`);
+  $('form').hidden = false;
+  const withBank = !data.no_pay && data.bank_pub; $('bankWrap').hidden = !withBank;
+  $('send').onclick = async () => {
+    const p = {}; ['rcv_name','rcv_phone','rcv_city','address','short_code','country'].forEach(k => p[k] = $(k).value.trim());
+    if (!data.no_ship && (!p.rcv_name || !p.rcv_phone || !p.rcv_city || !p.address)) { alertBox('عبّ الاسم والجوال والمدينة والعنوان'); return; }
+    let cipher = null;
+    if (withBank) {
+      const b = { holder: $('holder').value.trim(), bank: $('bank').value.trim(), iban: $('iban').value.replace(/\s/g,'').toUpperCase() };
+      if (!b.holder || !/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(b.iban)) { alertBox('اكتب اسم صاحب الحساب والآيبان كامل (يبدأ بـ SA)'); return; }
+      const pub = await crypto.subtle.importKey('jwk', data.bank_pub, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+      const k = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(b)));
+      const ek = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, pub, await crypto.subtle.exportKey('raw', k));
+      cipher = { ek: b64(ek), iv: b64(iv), ct: b64(ct) };
+    }
+    $('send').disabled = true;
+    const r = await sb.rpc('intake_submit', { p_token: token, p, p_cipher: cipher });
+    $('send').disabled = false;
+    if (r.error || !r.data) return alertBox('ما قدرنا نحفظ. جرّب مرة ثانية.');
+    $('form').hidden = true; say('وصلتنا بياناتك، شكراً لك. بنبلغك أول ما ينشحن المنتج.');
+  };
+  function alertBox(t){ const e = $('toast'); e.textContent = t; e.className = 'toast bad'; e.hidden = false; setTimeout(() => e.hidden = true, 3500); }
+})();
+</script>
+</body>
+</html>

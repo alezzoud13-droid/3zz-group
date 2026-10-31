@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>أداء فريق العز</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- تسجيل الدخول -->
+<section id="authView" class="auth" hidden>
+  <div class="panel">
+    <h2>أداء فريق العز</h2>
+    <p class="muted" style="margin:0" id="authHint">ادخل بإيميلك وكلمة المرور.</p>
+    <div class="field" id="nameWrap" hidden><label for="aName">اسمك</label><input type="text" id="aName" autocomplete="name"></div>
+    <div class="field"><label for="aEmail">الإيميل</label><input type="email" id="aEmail" autocomplete="email"></div>
+    <div class="field"><label for="aPass">كلمة المرور</label><input type="password" id="aPass" autocomplete="current-password"></div>
+    <button class="btn primary" id="aGo" type="button">دخول</button>
+    <button class="btn" id="aSwitch" type="button">ما عندك حساب؟ سجّل</button>
+    <div class="note" id="aMsg" hidden></div>
+  </div>
+</section>
+
+<section id="waitView" class="auth" hidden>
+  <div class="panel">
+    <h2>حسابك بانتظار التفعيل</h2>
+    <p style="margin:0">سجّلت بنجاح. عبدالمحسن يفعّل حسابك ويحدد دورك، وبعدها تقدر تشتغل.</p>
+    <button class="btn" id="wRetry" type="button">تحقّق مرة ثانية</button>
+    <button class="btn" id="wOut" type="button">خروج</button>
+  </div>
+</section>
+
+<div id="appView" hidden>
+<header class="top"><div class="top-in">
+  <div class="brand">
+    <h1>أداء فريق العز</h1>
+    <div class="who">
+      <button class="newbtn" id="newDeal" type="button">+ ترشيح</button>
+      <button class="newbtn" id="newReq" type="button">+ طلب</button>
+      <span id="whoName"></span>
+      <button class="linkbtn" id="signOut" type="button">خروج</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <a href="#mine" data-v="mine">مهامي<span class="cnt" id="mineCnt" hidden></span></a>
+    <a href="#pipe" data-v="pipe">خط الإنتاج</a>
+    <a href="#req" data-v="req">الطلبات</a>
+    <a href="#today" data-v="today">تقرير اليوم</a>
+    <a href="#dash" data-v="dash" class="adm">لوحة الأداء</a>
+    <a href="#setup" data-v="setup" class="adm">الإعدادات</a>
+  </nav>
+</div></header>
+
+<main>
+  <section id="v-mine" class="view" hidden>
+    <div class="panel"><div class="row between"><div><h2 id="mineTitle">مهامي</h2><div class="muted small" id="mineSub"></div></div>
+      <div class="field adm" style="min-width:200px"><label for="mineAs">اعرض مهام</label><select id="mineAs"></select></div></div></div>
+    <div id="mineBody" style="display:grid;gap:16px"></div>
+  </section>
+
+  <section id="v-pipe" class="view" hidden>
+    <div class="panel"><div class="row between"><h2>خط الإنتاج</h2><span class="muted small">اضغط على أي مرحلة لعرض ملفاتها</span></div><div class="board" id="board"></div></div>
+    <div class="panel"><div class="row">
+      <div class="field" style="flex:1 1 180px"><label for="pQ">بحث</label><input type="search" id="pQ" placeholder="اسم المؤثر، الجوال، اليوزر، الكود"></div>
+      <div class="field" style="flex:1 1 150px"><label for="pMem">صانع المحتوى</label><select id="pMem"></select></div>
+      <div class="field" style="flex:1 1 150px"><label for="pCamp">الحملة</label><select id="pCamp"></select></div>
+      <label class="check small"><input type="checkbox" id="pLate"> المتأخرة فقط</label>
+      <label class="check small"><input type="checkbox" id="pClosed"> أظهر المغلقة</label>
+    </div></div>
+    <div id="pList"></div>
+  </section>
+
+  <section id="v-req" class="view" hidden>
+    <div class="panel"><div class="row between"><div><h2>الطلبات</h2><div class="muted small">أي شغل تبيه من زميل (تصميم، شحن، إطلاق إعلان...) يُطلب من هنا بدل الواتساب، وله صاحب وموعد.</div></div>
+      <div class="row"><div class="field"><label for="rScope">اعرض</label><select id="rScope"><option value="to">المطلوب مني</option><option value="from">طلباتي من غيري</option><option value="all">الكل</option></select></div>
+      <label class="check small"><input type="checkbox" id="rDone"> أظهر المنتهية</label></div></div></div>
+    <div id="rList"></div>
+  </section>
+
+  <section id="v-today" class="view" hidden>
+    <div class="panel"><div class="row between"><div><h2>تقرير اليوم</h2><div class="muted small">شغلك في خط الإنتاج والطلبات ينحسب تلقائياً. اكتب الباقي واضغط حفظ.</div></div>
+      <div class="field"><label for="tDate">التاريخ</label><input type="date" id="tDate"></div></div></div>
+    <div class="panel"><h3>اللي سجّلته اليوم في النظام</h3><div id="tAuto"></div></div>
+    <div class="panel"><div id="tTasks" style="display:grid;gap:8px"></div>
+      <div class="grid2"><div class="field"><label for="tNote">وش سويت غير المسجّل؟</label><textarea id="tNote"></textarea></div>
+      <div class="field"><label for="tBlock">معوّقات تحتاج تدخّل</label><textarea id="tBlock"></textarea></div></div>
+      <div class="row between"><span class="muted small" id="tState"></span><button class="btn primary" id="tSave" type="button">حفظ</button></div></div>
+  </section>
+
+  <section id="v-dash" class="view" hidden>
+    <div class="panel"><div class="row between"><div><h2>لوحة الأداء</h2><div class="muted small" id="dSub"></div></div>
+      <div class="row"><div class="field"><label for="dPeriod">الفترة</label><select id="dPeriod"><option value="month">هذا الشهر</option><option value="last">الشهر الماضي</option><option value="30">آخر 30 يوم</option><option value="all">الكل</option></select></div>
+      <button class="btn primary" id="dXlsx" type="button" style="align-self:end">تنزيل Excel</button></div></div></div>
+    <div class="tiles" id="dTiles"></div>
+    <div class="panel"><h3>المراحل: وين يتأخر الشغل؟</h3><div class="tw" id="dSteps"></div>
+      <div class="note">«مفتوح» = ملفات واقفة عند المرحلة الحين. «متأخر» = تجاوز المدة المسموحة. «وسيط الأيام» = نصف الملفات خلصت المرحلة خلال هذي المدة أو أقل. أعلى وسيط هو عنق الزجاجة.</div></div>
+    <div class="panel"><h3>صناع المحتوى</h3><div class="tw" id="dCreators"></div>
+      <div class="note">«الإنجاز» = اللي نشروا ÷ اللي وصلهم المنتج. «أكواد كاملة» = نسبة المنشور اللي فيه كل أكواد منصاته. «أيام للنشر» = وسيط الأيام من وصول المنتج للنشر، وهذا الجزء اللي بيد الصانع.</div></div>
+    <div class="panel"><h3>الطلبات حسب المسؤول</h3><div class="tw" id="dReqs"></div></div>
+  </section>
+
+  <section id="v-setup" class="view" hidden>
+    <div class="panel"><h2>الفريق والأدوار</h2><div class="muted small">كل شخص يسجّل من صفحة الدخول، وأنت تفعّله وتحدد دوره هنا. الدور يحدد وش يطلع له في «مهامي».</div><div class="tw" id="sMembers"></div></div>
+    <div class="panel"><div class="row between"><h2>الحملات</h2><button class="btn" id="sCampAdd" type="button">+ حملة</button></div><div id="sCamps" style="display:grid;gap:8px"></div></div>
+    <div class="panel"><h2>المدة المسموحة لكل مرحلة (أيام)</h2><div class="grid3" id="sSla"></div><div><button class="btn primary" id="sSlaSave" type="button">حفظ المدد</button></div></div>
+    <div class="panel"><h2>قائمة تقرير اليوم لكل دور</h2><div class="muted small">سطر لكل مهمة. صناع المحتوى ما يحتاجون قائمة لأن شغلهم ينحسب من خط الإنتاج.</div><div class="grid2" id="sTasks"></div><div><button class="btn primary" id="sTasksSave" type="button">حفظ القوائم</button></div></div>
+    <div class="panel"><h2>البيانات البنكية</h2><div id="sBank"></div></div>
+  </section>
+</main>
+</div>
+
+<div id="toast" class="toast" hidden role="status"></div>
+<div id="ov" class="ov" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
