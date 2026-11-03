@@ -5,7 +5,7 @@ const C = window.APP_CONFIG;
 const sb = supabase.createClient(C.supabaseUrl, C.supabaseKey);
 
 /* ================= ثوابت ================= */
-const ROLES = { creator: 'صانع محتوى', approver: 'الاعتماد (متعب)', shipper: 'الشحن', media: 'الميديا باير', snap: 'منسق سناب', social: 'السوشيال ميديا', design: 'التصميم', owned: 'الحسابات المملوكة' };
+const ROLES = { creator: 'صانع محتوى', approver: 'الاعتماد (متعب)', shipper: 'الشحن', media: 'الميديا باير', snap: 'منسق المحتوى (زياد)', social: 'السوشيال ميديا', design: 'التصميم', owned: 'الحسابات المملوكة' };
 const STEPS = [
   { k: 'nom', n: 'الترشيح', who: 'creator' },
   { k: 'appr', n: 'الاعتماد', who: 'approver' },
@@ -523,7 +523,7 @@ const QL = {
   acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
   acq_contact: 'معتمد: تواصل وفاوض', intake: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', ship_send: 'جاهزة للشحن', ship_wait: 'في الطريق: سجّل الوصول', ship_fail: 'تعذّر التسليم: تابعها',
   video: 'وصله المنتج: نسّق المقطع', video_fix: 'مسودات رجعت للتعديل', draft: 'مسودات مقاطع تنتظر اعتمادك', post: 'سجّل النزول والكود لكل منصة',
-  launch: 'نزل: شغّل الإعلان', snap_follow: 'سناب نزل: تابع التشغيل', req_in: 'طلبات عليك', req_review: 'طلبات سلّموها لك: راجعها', pay: 'تنتظر الدفع', park: 'احتياط'
+  launch: 'نزل: شغّل الإعلان', snap_follow: 'محتوى نزل: سلّمه للميديا باير وتابع التشغيل', req_in: 'طلبات عليك', req_review: 'طلبات سلّموها لك: راجعها', pay: 'تنتظر الدفع', park: 'احتياط'
 };
 const QO = ['members', 'acq_review', 'appr', 'quota_req', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'launch', 'snap_follow', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'park'];
 const BULK = {
@@ -549,7 +549,7 @@ function queuesFor(id) {
     if (isParked(d)) { if (d.member_id === id || isAp) add('park', { d, i: SI.appr }); continue; }
     const i = curStep(d);
     // التشغيل لكل منصة مستقل: أول ما تنزل منصة تروح للميديا باير
-    if (d.approval === 'approved') for (const p of platKeys(d)) if (delivered(d, p) && !launched(d, p)) { if (strictRole(id, 'media')) add('launch', { d, i: SI.live, p }); if (p === 'sn' && strictRole(id, 'snap')) add('snap_follow', { d, i: SI.live, p }); }
+    if (d.approval === 'approved') for (const p of platKeys(d)) if (delivered(d, p) && !launched(d, p)) { if (strictRole(id, 'media')) add('launch', { d, i: SI.live, p }); if (strictRole(id, 'snap')) add('snap_follow', { d, i: SI.live, p }); }
     if (i < 0 || i >= STEPS.length) continue;
     const k = STEPS[i].k;
     if (k === 'appr') { if (isAp) add('appr', { d, i }); continue; }
