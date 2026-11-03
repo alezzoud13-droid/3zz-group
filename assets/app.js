@@ -36,7 +36,10 @@ const today = () => ymd(new Date());
 const nowIso = () => new Date().toISOString();
 const days = (a, b) => (a && b) ? Math.round((new Date(b) - new Date(a)) / 864e5) : null;
 const ageOf = a => a ? Math.max(0, Math.floor((Date.now() - new Date(a)) / 864e5)) : 0;
-const dShort = s => s ? new Date(s).toLocaleDateString('ar-SA-u-ca-gregory', { day: 'numeric', month: 'short' }) : '';
+const TZ = 'Asia/Riyadh', LOC = 'ar-SA-u-ca-gregory-nu-latn';
+const dShort = s => !s ? '' : String(s).length <= 10 ? new Date(s + 'T12:00:00').toLocaleDateString(LOC, { day: 'numeric', month: 'short', year: 'numeric' }) : new Date(s).toLocaleString(LOC, { timeZone: TZ, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+const dtFull = t => t ? new Date(t).toLocaleString(LOC, { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }) : '';
+const dtX = t => t ? new Date(t).toLocaleString('sv-SE', { timeZone: TZ }).slice(0, 19) : '';
 const fmt = n => n == null || isNaN(n) ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 1 });
 const pct = (a, b) => b ? Math.round(a / b * 100) : null;
 const median = a => { const v = a.filter(x => x != null && !isNaN(x)).sort((x, y) => x - y); if (!v.length) return null; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
@@ -769,11 +772,10 @@ const DET_HINT = { design: 'وش التصميم؟ لمين؟ النص اللي �
 const links = s => ((s || '').match(/https?:\/\/[^\s<>"']+/g) || []);
 const tms = t => t ? new Date(t).getTime() : 0;
 const ago = t => { const m = (Date.now() - tms(t)) / 6e4; return m < 1 ? 'الحين' : m < 60 ? `قبل ${Math.round(m)} دقيقة` : m < 1440 ? `قبل ${Math.round(m / 60)} ساعة` : `قبل ${Math.round(m / 1440)} يوم`; };
-const dtFull = t => new Date(t).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 const linkify = s => esc(s || '').replace(/https?:\/\/[^\s<>"']+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>`);
 const involved = r => r.to_member === S.me.id || r.from_member === S.me.id || (r.kind === 'quota' && !r.to_member && isApprover());
 const unread = r => !!(r.last_event_at && r.last_event_by && r.last_event_by !== S.me.id && involved(r) && tms(S.reads[r.id]) < tms(r.last_event_at));
-const lastLine = r => r.last_event_at ? `${memName(r.last_event_by)} ${EV[r.last_event_type] || ''} · ${ago(r.last_event_at)}` : '';
+const lastLine = r => r.last_event_at ? `${memName(r.last_event_by)} ${EV[r.last_event_type] || ''} · ${dtFull(r.last_event_at)} (${ago(r.last_event_at)})` : '';
 async function markRead(r) { if (S.noEv) return; const t = new Date(Math.max(Date.now(), tms(r.last_event_at))).toISOString(); S.reads[r.id] = t; S.notified[r.id] = r.last_event_at; await sb.from('request_reads').upsert({ request_id: r.id, member_id: S.me.id, seen_at: t }); updateMineCount(); }
 async function addEv(r, type, body) {
   if (S.noEv) return { created_at: nowIso() };
@@ -837,17 +839,17 @@ async function openReq(id) {
   const { data: E0, error: eE } = await sb.from('request_events').select('*').eq('request_id', id).order('created_at'); const E = E0 || []; if (eE) S.noEv = true;
   const quota = r.kind === 'quota', canQ = quota && isApprover() && !['done', 'cancelled'].includes(r.status), open = !['done', 'cancelled'].includes(r.status);
   let dn = 0; const evHtml = E.map(e => { const lbl = e.type === 'deliver' ? (++dn === 1 ? 'سلّم' : `سلّم التعديل ${dn - 1}`) : EV[e.type] || e.type;
-    return `<div class="ev ${EV_CLS[e.type] || ''}"><div class="h"><b>${esc(memName(e.member_id))}</b> <span class="pill ${EV_CLS[e.type] || ''}">${esc(lbl)}</span><span class="muted small" title="${esc(e.created_at)}">${dtFull(e.created_at)}</span></div>${e.body ? `<div class="b">${linkify(e.body)}</div>` : ''}</div>`; }).join('');
+    return `<div class="ev ${EV_CLS[e.type] || ''}"><div class="h"><b>${esc(memName(e.member_id))}</b> <span class="pill ${EV_CLS[e.type] || ''}">${esc(lbl)}</span><span class="muted small">${dtFull(e.created_at)}</span></div>${e.body ? `<div class="b">${linkify(e.body)}</div>` : ''}</div>`; }).join('');
   const steps = ['انطلب', 'قيد التنفيذ', 'بانتظار المراجعة', 'معتمد'], si = { new: 0, doing: 1, fix: 1, review: 2, done: 3, cancelled: -1 }[r.status];
   const prog = r.status === 'cancelled' ? '' : `<div class="stepper s4">${steps.map((s, j) => `<div class="st ${j < si || si === 3 ? 'd' : j === si ? 'c' : ''}"><b></b><span>${j === 1 && r.status === 'fix' ? 'يتعدّل' : s}</span></div>`).join('')}</div>`;
   const canDeliver = !quota && isTo && ['new', 'doing', 'fix'].includes(r.status);
   const lastFix = [...E].reverse().find(e => e.type === 'fix' || e.type === 'reopen');
-  modal(`<div class="row between"><div><h2>${esc(r.title)}</h2><div class="muted small">${esc(REQ_KINDS[r.kind])} · من ${esc(memName(r.from_member))}${r.to_member ? ' إلى ' + esc(memName(r.to_member)) : ''} · ${r.due ? 'الموعد ' + r.due : 'بدون موعد'}${r.rounds ? ' · ' + r.rounds + ' جولة تعديل' : ''}</div></div><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></div>
+  modal(`<div class="row between"><div><h2>${esc(r.title)}</h2><div class="muted small">${esc(REQ_KINDS[r.kind])} · من ${esc(memName(r.from_member))}${r.to_member ? ' إلى ' + esc(memName(r.to_member)) : ''} · ${r.due ? 'الموعد ' + dShort(r.due) : 'بدون موعد'}${r.rounds ? ' · ' + r.rounds + ' جولة تعديل' : ''}</div><div class="muted small">انطلب: ${dtFull(r.created_at)}${r.done_at ? ' · انتهى: ' + dtFull(r.done_at) : ''}</div></div><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></div>
    ${prog}
    ${quota ? `<div class="small">الحصة الحالية: ${quotaOf(r.campaign_id, r.from_member)} · المطلوب زيادة: ${r.qty}</div>` : `<div class="card"><div class="hd"><b>الطلب</b>${isFrom && open ? '<button class="btn sm" data-q="edit" type="button" style="margin-inline-start:auto">تعديل الطلب</button>' : ''}</div>
      <div style="white-space:pre-wrap">${linkify(r.details) || '<span class="muted">بدون تفاصيل</span>'}</div>
      <div class="small muted">${r.size ? 'المقاس: ' + esc(r.size) : ''}${r.size && r.ref_url ? ' · ' : ''}${r.ref_url ? 'المرجع: ' + linkify(r.ref_url) : ''}</div></div>`}
-   <h3 style="margin:4px 0 0">السجل</h3><div class="tl">${evHtml || (S.noEv ? '<div class="note">السجل يشتغل بعد تشغيل تحديث قاعدة البيانات رقم 3.</div>' : '<div class="muted small">ما فيه أحداث.</div>')}</div>
+   <h3 style="margin:4px 0 0">السجل <span class="muted small" style="font-weight:400">· الأوقات بتوقيت الرياض</span></h3><div class="tl">${evHtml || (S.noEv ? '<div class="note">السجل يشتغل بعد تشغيل تحديث قاعدة البيانات رقم 3.</div>' : '<div class="muted small">ما فيه أحداث.</div>')}</div>
    ${canDeliver ? `<div class="card ${r.status === 'fix' ? 'warnc' : ''}"><div class="hd"><b>${r.status === 'fix' ? 'المطلوب تعديله' : 'التسليم'}</b></div>
      ${r.status === 'fix' && lastFix ? `<div class="note" style="white-space:pre-wrap">${linkify(lastFix.body)}</div>` : ''}
      <div class="field"><label for="qRes">${r.status === 'fix' ? 'وش عدّلت؟ (حط الرابط الجديد)' : 'وش سلّمت؟'}</label><textarea id="qRes" rows="3" placeholder="${esc(RES_HINT[r.kind] || RES_HINT.other)}"></textarea></div>
@@ -955,14 +957,16 @@ function renderDash() {
   const byTo = {}; for (const r of S.reqs) { if (!r.to_member || r.kind === 'quota') continue; const o = byTo[r.to_member] = byTo[r.to_member] || { n: 0, done: 0, ontime: 0, due: 0, rounds: [], open: 0, late: 0 }; if (inP(r.created_at)) o.n++; if (inP(r.done_at)) { o.done++; o.rounds.push(r.rounds || 0); if (r.due) { o.due++; if (r.done_at.slice(0, 10) <= r.due) o.ontime++; } } if (!['done', 'cancelled'].includes(r.status)) { o.open++; if (r.due && r.due < today()) o.late++; } }
   $('dReqs').innerHTML = `<table><thead><tr><th>المسؤول</th><th class="num">طلبات جديدة</th><th class="num">سلّمها</th><th class="num">في الموعد</th><th class="num">متوسط جولات التعديل</th><th class="num">مفتوحة</th><th class="num">متأخرة</th></tr></thead><tbody>${Object.entries(byTo).map(([id, o]) => `<tr><td>${esc(memName(id))}</td><td class="num">${o.n}</td><td class="num">${o.done}</td><td class="num">${pl(pct(o.ontime, o.due))}</td><td class="num">${o.rounds.length ? fmt(o.rounds.reduce((s, x) => s + x, 0) / o.rounds.length) : '—'}</td><td class="num">${o.open}</td><td class="num">${o.late || ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">ما فيه طلبات للحين.</td></tr>'}</tbody></table>`;
 }
-$('dXlsx').onclick = () => {
-  const dt = t => t ? String(t).slice(0, 10) : '';
+$('dXlsx').onclick = async () => {
+  const dt = t => !t ? '' : String(t).length <= 10 ? String(t) : dtX(t);
   const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال لمتعب': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'الدفع': dt(d.paid_at) }));
   const infls = S.infl.map(i => ({ 'المعلن': i.name, 'بالإنجليزي': i.name_en, 'اليوزر': i.handle, 'رابط تيك توك': i.tiktok_url, 'نوع الحساب': i.acc_type, 'حالة الحساب': i.account_status, 'المرشِّح': memName(i.nominated_by), 'تاريخ الترشيح': i.nominated_on, 'المصدر': i.source === 'acq' ? 'استقطاب' : i.source === 'campaign' ? 'حملة' : 'مستورد', 'حالة الاستقطاب': (ACQ[i.acq_status] || [i.acq_status])[0], 'سبب القرار': i.acq_reason, 'محاولات التواصل': (i.contacts || []).length, 'آخر نتيجة': ((i.contacts || []).slice(-1)[0] || {}).result || '', 'واجه مشكلة': i.had_problem == null ? '' : i.had_problem ? 'نعم' : 'لا', 'المشكلة': i.problem, 'المنصات': i.platforms, 'سناب': i.snap_user, 'انستقرام': i.ig_user, 'الجوال': i.phone, 'الدولة': i.country, 'المدينة': i.city, 'الحي والرمز': i.district, 'قبل التفاوض': i.price_before, 'بعد التفاوض': i.price_after, 'العملة': i.currency, 'تم الاتفاق': dt(i.agreed_at) }));
   const reqs = S.reqs.map(r => ({ 'النوع': REQ_KINDS[r.kind], 'العنوان': r.title, 'من': memName(r.from_member), 'إلى': memName(r.to_member), 'الموعد': r.due, 'الحالة': REQ_STATUS[r.status][0], 'جولات التعديل': r.rounds, 'تاريخ الطلب': dt(r.created_at), 'تاريخ التسليم': dt(r.done_at), 'التسليم': r.result_url }));
   const camps = S.camps.map(c => { const s = campStats(c.id); return { 'الحملة': c.name, 'الحالة': CAMP_ST[c.status || 'active'][0], 'المطلوب': c.target_total, 'موزّع': S.quotas.filter(q => q.campaign_id === c.id).reduce((x, q) => x + q.quota, 0), 'انرسل': s.sent.length, 'معتمد': s.approved.length, 'مرفوض': s.rejected.length, 'استلموا': s.approved.filter(d => d.delivered_at).length, 'نشروا': s.approved.filter(allDelivered).length }; });
   const wb = XLSX.utils.book_new(); const add = (rows, n) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, n); };
-  add(camps, 'الحملات'); add(deals, 'ترشيحات الحملات'); add(infls, 'المؤثرين والاستقطاب'); add(reqs, 'الطلبات'); XLSX.writeFile(wb, `أداء فريق العز ${today()}.xlsx`);
+  add(camps, 'الحملات'); add(deals, 'ترشيحات الحملات'); add(infls, 'المؤثرين والاستقطاب'); const { data: EVS } = await sb.from('request_events').select('*').order('created_at').limit(20000);
+  const evs = (EVS || []).map(e => { const r = S.reqs.find(x => x.id === e.request_id) || {}; return { 'التاريخ والوقت (الرياض)': dtX(e.created_at), 'الطلب': r.title || '', 'الشخص': memName(e.member_id), 'الحدث': EV[e.type] || e.type, 'التفاصيل': e.body }; });
+  add(reqs, 'الطلبات'); if (evs.length) add(evs, 'سجل الطلبات'); XLSX.writeFile(wb, `أداء فريق العز ${today()}.xlsx`);
 };
 
 /* ================= الإعدادات ================= */
