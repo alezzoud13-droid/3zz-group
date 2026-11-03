@@ -106,7 +106,7 @@ const draftPending = d => !!(d.draft_at && !d.video_ok_at && !allDelivered(d));
 const adName = d => [camp(d.campaign_id).name, d.name, d.hook, memName(d.member_id)].map(x => String(x || '').trim()).filter(Boolean).join(' | ');
 const adNameFor = (d, p) => adName(d) + ' | ' + PL[p] + (p === 'sn' ? (d.sn_user ? ' | ' + d.sn_user : '') : (d[p + '_code'] ? ' | ' + d[p + '_code'] : ''));
 const intakeLink = d => location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'intake.html?t=' + d.intake_token;
-const waLink = (phone, txt) => { const p = String(phone || '').replace(/\D/g, '').replace(/^0(?=5)/, '966'); return p ? 'https://wa.me/' + p + '?text=' + encodeURIComponent(txt) : ''; };
+const waLink = (phone, txt) => { let p = String(phone || '').replace(/\D/g, '').replace(/^00/, '').replace(/^0(?=5)/, '966'); if (/^5\d{8}$/.test(p)) p = '966' + p; if (p.length < 9) p = ''; return p ? 'https://wa.me/' + p + '?text=' + encodeURIComponent(txt) : ''; };
 const isContinuing = i => !!i && S.deals.some(d => d.influencer_id === i.id && allDelivered(d));
 
 /* ================= البيانات ================= */
