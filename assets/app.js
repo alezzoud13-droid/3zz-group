@@ -24,7 +24,7 @@ const CONTACT_RES = ['ما رد', 'رد وجاري التفاوض', 'ما اتف
 const AD_TYPES = ['منزلي', 'خارجي', 'حضوري'];
 const ACQ = { draft: ['مسودة', ''], pending: ['بانتظار المراجعة', 'acc'], needs_edit: ['يحتاج تعديل', 'warn'], approved: ['معتمد: تواصل وفاوض', 'good'], rejected: ['مرفوض', 'bad'], none: ['من الحملات', ''] };
 const REQ_KINDS = { design: 'تصميم', ship: 'شحن', ad: 'إطلاق إعلان', snap: 'سناب', social: 'سوشيال ميديا', quota: 'زيادة حصة ترشيح', other: 'أخرى' };
-const REQ_STATUS = { new: ['جديد', 'acc'], doing: ['قيد التنفيذ', 'warn'], review: ['بانتظار المراجعة', 'acc'], done: ['منتهي', 'good'], cancelled: ['ملغي', ''] };
+const REQ_STATUS = { new: ['جديد', 'acc'], doing: ['قيد التنفيذ', 'warn'], review: ['بانتظار المراجعة', 'acc'], fix: ['يحتاج تعديل', 'bad'], done: ['منتهي', 'good'], cancelled: ['ملغي', ''] };
 const CAMP_ST = { active: ['شغالة', 'good'], paused: ['متوقفة', 'warn'], ended: ['منتهية', ''] };
 
 /* ================= أدوات ================= */
@@ -61,7 +61,7 @@ const opts = (list, sel) => list.map(v => `<option ${v === sel ? 'selected' : ''
 const optsBlank = (list, sel, blank) => `<option value="">${blank || 'اختر'}</option>` + opts(list, sel);
 
 /* ================= الحالة ================= */
-const S = { user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
+const S = { reads: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
 const mem = id => S.members.find(m => m.id === id);
 const memName = id => (mem(id) || {}).name || '—';
 const active = () => S.members.filter(m => m.active);
@@ -112,16 +112,17 @@ const isContinuing = i => !!i && S.deals.some(d => d.influencer_id === i.id && a
 /* ================= البيانات ================= */
 async function q(p) { const { data, error } = await p; if (error) { console.warn(error); toast(/row-level|لمتعب/.test(error.message) ? (error.message.includes('متعب') ? error.message : 'ما عندك صلاحية لهذي العملية') : 'تعذّر الحفظ: ' + error.message, true); return null; } return data ?? true; }
 async function loadAll() {
-  const [m, c, s, d, r, i, qt] = await Promise.all([
+  const [m, c, s, d, r, i, qt, rd] = await Promise.all([
     sb.from('members').select('*').order('name'),
     sb.from('campaigns').select('*').order('created_at', { ascending: false }),
     sb.from('settings').select('*'),
     sb.from('deals').select('*').order('created_at', { ascending: false }).limit(5000),
     sb.from('requests').select('*').order('created_at', { ascending: false }).limit(3000),
     sb.from('influencers').select('*').order('created_at', { ascending: false }).limit(10000),
-    sb.from('quotas').select('*')
+    sb.from('quotas').select('*'),
+    sb.from('request_reads').select('request_id,seen_at')
   ]);
-  S.members = m.data || []; S.camps = c.data || []; S.deals = d.data || []; S.reqs = r.data || []; S.infl = i.data || []; S.quotas = qt.data || [];
+  S.members = m.data || []; S.camps = c.data || []; S.deals = d.data || []; S.reqs = r.data || []; S.infl = i.data || []; S.quotas = qt.data || []; S.reads = {}; for (const x of (rd.data || [])) S.reads[x.request_id] = x.seen_at; for (const x of S.reqs) if (!(x.id in S.notified)) S.notified[x.id] = x.last_event_at; if (!S.lastPoll) S.lastPoll = nowIso();
   for (const x of (s.data || [])) { if (x.key === 'sla') S.sla = { ...DEF_SLA, ...x.value }; if (x.key === 'daily_tasks') S.tasks = x.value || {}; if (x.key === 'bank_pub') S.bankPub = x.value; }
   S.me = S.members.find(x => x.id === S.user.id) || S.me;
 }
@@ -523,9 +524,9 @@ const QL = {
   acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
   acq_contact: 'معتمد: تواصل وفاوض', intake: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', ship_send: 'جاهزة للشحن', ship_wait: 'في الطريق: سجّل الوصول', ship_fail: 'تعذّر التسليم: تابعها',
   video: 'وصله المنتج: نسّق المقطع', video_fix: 'مسودات رجعت للتعديل', draft: 'مسودات مقاطع تنتظر اعتمادك', post: 'سجّل النزول والكود لكل منصة',
-  launch: 'نزل: شغّل الإعلان', snap_follow: 'محتوى نزل: سلّمه للميديا باير وتابع التشغيل', req_in: 'طلبات عليك', req_review: 'طلبات سلّموها لك: راجعها', pay: 'تنتظر الدفع', park: 'احتياط'
+  launch: 'نزل: شغّل الإعلان', snap_follow: 'محتوى نزل: سلّمه للميديا باير وتابع التشغيل', req_in: 'طلبات عليك', req_fix: 'طلبات رجعت لك للتعديل', req_new: 'تحديثات جديدة على طلباتك (ردود، تعديلات، تسليمات)', req_review: 'طلبات سلّموها لك: راجعها', pay: 'تنتظر الدفع', park: 'احتياط'
 };
-const QO = ['members', 'acq_review', 'appr', 'quota_req', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'launch', 'snap_follow', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'park'];
+const QO = ['members', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'launch', 'snap_follow', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'park'];
 const BULK = {
   appr: ['اعتماد', () => ({ approval: 'approved', approved_at: nowIso(), approved_by: S.me.id, decision_reason: '' })],
   ship_send: ['تم الشحن اليوم', () => ({ shipped_at: nowIso() })],
@@ -560,17 +561,19 @@ function queuesFor(id) {
   }
   if (id !== 'admin' && strictRole(id, 'creator')) for (const c of S.camps.filter(c => c.status === 'active')) { const qn = quotaOf(c.id, id); const s = campStats(c.id, id); if (qn > s.used) add('camp_quota', { c, left: qn - s.used }); }
   for (const r of S.reqs) {
+    if (id === S.me.id && unread(r)) add('req_new', { r });
     if (r.status === 'done' || r.status === 'cancelled') continue;
     if (r.kind === 'quota') { if (r.to_member === id || (isAp && !r.to_member)) add('quota_req', { r }); continue; }
     if (r.to_member === id && (r.status === 'new' || r.status === 'doing')) add('req_in', { r });
+    if (r.to_member === id && r.status === 'fix') add('req_fix', { r });
     if (r.from_member === id && r.status === 'review') add('req_review', { r });
   }
   if (id === 'admin') S.members.filter(m => !m.active).forEach(m => add('members', { m }));
   for (const k in G) G[k].sort((a, b) => (a.d && b.d) ? stepAge(b.d, b.i) - stepAge(a.d, a.i) : 0);
   return G;
 }
-function countFor(id) { const G = queuesFor(id); return Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact'].includes(k)).reduce((a, [, v]) => a + v.length, 0); }
-function updateMineCount() { if (!S.me) return; const n = countFor(S.me.id) + (isAdmin() ? countFor('admin') : 0); $('mineCnt').hidden = !n; $('mineCnt').textContent = n; }
+function countFor(id) { const G = queuesFor(id); return Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).reduce((a, [, v]) => a + v.length, 0); }
+function updateMineCount() { if (!S.me) return; const n = countFor(S.me.id) + (isAdmin() ? countFor('admin') : 0); $('mineCnt').hidden = !n; $('mineCnt').textContent = n; const u = S.reqs.filter(unread).length; $('reqCnt').hidden = !u; $('reqCnt').textContent = u; document.title = (u ? `(${u}) ` : '') + 'أداء فريق العز'; }
 function dealRow(x, bulk, k) {
   const { d, i, p } = x; const late = lateness(d, i); const age = p ? ageOf(d[p + '_at']) : stepAge(d, i);
   const miss = k === 'post' ? platKeys(d).filter(q => !delivered(d, q)).map(q => 'باقي ' + PL[q]).join('، ') : '';
@@ -580,16 +583,12 @@ function dealRow(x, bulk, k) {
   return `<div class="qrow ${late}">${bulk ? `<input type="checkbox" data-bulk="${d.id}" aria-label="تحديد">` : '<span></span>'}<div><div class="t">${esc(d.name)}</div><div class="sub">${esc(sub)}</div></div><div class="acts row" style="gap:6px;flex-wrap:nowrap">${apprBtns}${launchBtn}<span class="pill ${late === 'late' ? 'bad' : late === 'soon' ? 'warn' : ''}">${age} يوم</span><button class="btn sm" data-open="${d.id}" type="button">افتح</button></div></div>`;
 }
 function inflRow(i) { return `<div class="qrow"><span></span><div><div class="t">${esc(i.name)}</div><div class="sub">${esc([i.acc_type, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by), i.acq_reason && i.acq_reason.trim() ? 'المطلوب: ' + i.acq_reason : ''].filter(Boolean).join(' · '))}</div></div><div class="acts row" style="gap:6px"><span class="pill">${ageOf(i.acq_sent_at || i.created_at)} يوم</span><button class="btn sm" data-openinfl="${i.id}" type="button">افتح</button></div></div>`; }
-function reqRow(r) {
-  const late = r.due && r.due < today() ? 'late' : r.due === today() ? 'soon' : '';
-  return `<div class="qrow ${late}"><span></span><div><div class="t">${esc(r.title)}</div><div class="sub">${esc([REQ_KINDS[r.kind], 'من ' + memName(r.from_member), r.to_member ? 'إلى ' + memName(r.to_member) : '', r.due ? 'الموعد ' + r.due : ''].filter(Boolean).join(' · '))}</div></div><div class="acts row" style="gap:6px"><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span><button class="btn sm" data-req="${r.id}" type="button">افتح</button></div></div>`;
-}
 function renderMine() {
   const as = $('mineAs'); let id = S.me.id;
   if (isAdmin()) { const v = as.value || S.me.id; as.innerHTML = `<option value="${S.me.id}">أنا</option><option value="team">ملخص الفريق</option>` + active().filter(m => m.id !== S.me.id).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join(''); as.value = [...as.options].some(o => o.value === v) ? v : S.me.id; id = as.value; }
   if (id === 'team') return renderTeam();
   const G = queuesFor(id); if (id === S.me.id && isAdmin()) { const A = queuesFor('admin'); for (const k in A) G[k] = (G[k] || []).concat(A[k]); }
-  const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
+  const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
   $('mineTitle').textContent = id === S.me.id ? 'مهامي' : 'مهام ' + memName(id);
   $('mineSub').textContent = total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : 'ما عندك شي معلّق.';
   $('mineBody').innerHTML = QO.filter(k => G[k] && G[k].length).map(k => {
@@ -763,60 +762,142 @@ $('board').addEventListener('click', e => { const c = e.target.closest('[data-co
 $('pList').addEventListener('click', e => { const r = e.target.closest('[data-open]'); if (r) openDeal(r.dataset.open); });
 
 /* ================= الطلبات ================= */
+const EV = { created: 'أنشأ الطلب', edit: 'عدّل الطلب', start: 'بدأ التنفيذ', deliver: 'سلّم', fix: 'طلب تعديل', approve: 'اعتمد التسليم', cancel: 'ألغى الطلب', reopen: 'أعاد فتح الطلب للتعديل', comment: 'ردّ', quota_ok: 'وافق وزاد الحصة', quota_no: 'رفض الطلب' };
+const EV_CLS = { deliver: 'good', approve: 'good', quota_ok: 'good', fix: 'bad', reopen: 'bad', quota_no: 'bad', edit: 'warn', comment: 'acc', created: 'acc' };
+const RES_HINT = { design: 'حط رابط التصميم (درايف أو كانفا) واكتب أي ملاحظة.', ad: 'اكتب اسم الإعلان أو الحملة في مدير الإعلانات، والمنصة، ووقت التشغيل. ولو عندك رابط حطه.', snap: 'اكتب وش سوّيت (مثلاً: تواصلت مع المشهور واتفقنا على موعد النشر) وحط الرابط لو فيه.', ship: 'اكتب رقم الشحنة أو شركة الشحن وأي ملاحظة.', social: 'حط رابط المنشور أو المحتوى وأي ملاحظة.', other: 'اكتب وش سوّيت، وحط رابط لو فيه (ملف، صورة، منشور).' };
+const DET_HINT = { design: 'وش التصميم؟ لمين؟ النص اللي ينكتب عليه، الألوان أو الستايل، وأي شي لازم يكون موجود.', ad: 'وش الإعلان؟ أي منصة؟ الميزانية والمدة، والجمهور، والمحتوى أو الكود المستخدم.', snap: 'مين المشهور؟ وش المطلوب منه؟ والموعد.', ship: 'وش ينشحن؟ لمين؟ والعنوان.', social: 'وش المنشور؟ أي منصة؟ النص والموعد.', other: 'اكتب المطلوب بالضبط، وكيف تعرف إنه خلص.' };
+const links = s => ((s || '').match(/https?:\/\/[^\s<>"']+/g) || []);
+const tms = t => t ? new Date(t).getTime() : 0;
+const ago = t => { const m = (Date.now() - tms(t)) / 6e4; return m < 1 ? 'الحين' : m < 60 ? `قبل ${Math.round(m)} دقيقة` : m < 1440 ? `قبل ${Math.round(m / 60)} ساعة` : `قبل ${Math.round(m / 1440)} يوم`; };
+const dtFull = t => new Date(t).toLocaleString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+const linkify = s => esc(s || '').replace(/https?:\/\/[^\s<>"']+/g, u => `<a href="${u}" target="_blank" rel="noopener">${u.length > 60 ? u.slice(0, 57) + '…' : u}</a>`);
+const involved = r => r.to_member === S.me.id || r.from_member === S.me.id || (r.kind === 'quota' && !r.to_member && isApprover());
+const unread = r => !!(r.last_event_at && r.last_event_by && r.last_event_by !== S.me.id && involved(r) && tms(S.reads[r.id]) < tms(r.last_event_at));
+const lastLine = r => r.last_event_at ? `${memName(r.last_event_by)} ${EV[r.last_event_type] || ''} · ${ago(r.last_event_at)}` : '';
+async function markRead(r) { if (S.noEv) return; const t = new Date(Math.max(Date.now(), tms(r.last_event_at))).toISOString(); S.reads[r.id] = t; S.notified[r.id] = r.last_event_at; await sb.from('request_reads').upsert({ request_id: r.id, member_id: S.me.id, seen_at: t }); updateMineCount(); }
+async function addEv(r, type, body) {
+  if (S.noEv) return { created_at: nowIso() };
+  const { data: e, error } = await sb.from('request_events').insert({ request_id: r.id, member_id: S.me.id, type, body: body || '' }).select().single();
+  if (error) { if (/request_events|relation|schema cache/i.test(error.message)) { S.noEv = true; console.warn('تحديث قاعدة البيانات 003 ما انشغّل'); return { created_at: nowIso() }; } toast('تعذّر تسجيل الحدث: ' + error.message, true); return null; }
+  if (e) { Object.assign(r, { last_event_at: e.created_at, last_event_by: S.me.id, last_event_type: type }); await markRead(r); }
+  return e;
+}
+async function reqAct(r, ch, type, body) { const x = ch ? await saveReq(r.id, ch) : r; if (!x) return null; await addEv(x, type, body); return x; }
 function memOpts(sel) { return active().map(m => `<option value="${m.id}" ${m.id === sel ? 'selected' : ''}>${esc(m.name)} — ${esc((m.roles || []).map(r => ROLES[r]).join('، '))}</option>`).join(''); }
-$('newReq').onclick = () => {
-  const designer = withRole('design').find(m => (m.roles || []).includes('design'));
-  modal(`<h2>طلب جديد</h2><div class="grid2">
-   <div class="field"><label for="rKind">النوع</label><select id="rKind">${Object.entries(REQ_KINDS).filter(([k]) => k !== 'quota').map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>
-   <div class="field"><label for="rTo">مطلوب من</label><select id="rTo">${memOpts(designer && designer.id)}</select></div>
-   <div class="field"><label for="rTitle">العنوان *</label><input type="text" id="rTitle" placeholder="مثال: بنر هيرش سيطرة للمتجر"></div>
-   <div class="field"><label for="rDue">الموعد</label><input type="date" id="rDue" min="${today()}"></div>
-   <div class="field"><label for="rSize">المقاس أو المنصة</label><input type="text" id="rSize" placeholder="مثال: 1080×1920 ستوري"></div>
-   <div class="field"><label for="rRef">رابط مرجع</label><input type="url" id="rRef" dir="ltr"></div></div>
-   <div class="field"><label for="rDet">التفاصيل</label><textarea id="rDet"></textarea></div>
-   <div class="row"><button class="btn primary" id="rSave" type="button">إرسال الطلب</button><button class="btn" id="rCancel" type="button">إلغاء</button></div>`, () => {
-    const kind = $('rKind'); kind.onchange = () => { const map = { design: 'design', ship: 'shipper', ad: 'media', snap: 'snap', social: 'social' }; const m = active().find(x => (x.roles || []).includes(map[kind.value] || '')); if (m) $('rTo').value = m.id; };
-    $('rCancel').onclick = closeModal;
-    $('rSave').onclick = async () => { const title = $('rTitle').value.trim(); if (!title) return toast('اكتب عنوان الطلب', true); $('rSave').disabled = true;
-      const r = await saveReq(null, { kind: kind.value, to_member: $('rTo').value, title, due: $('rDue').value || null, size: $('rSize').value.trim(), ref_url: $('rRef').value.trim(), details: $('rDet').value.trim(), from_member: S.me.id });
-      if (r) { toast('انرسل الطلب'); closeModal(); } else $('rSave').disabled = false; };
+
+function reqForm(r) {
+  const edit = !!r, designer = withRole('design').find(m => (m.roles || []).includes('design')), k0 = edit ? r.kind : 'design';
+  modal(`<h2>${edit ? 'تعديل الطلب' : 'طلب جديد'}</h2>${edit ? '<div class="note">أي تعديل يوصل إشعار للمسؤول عن الطلب، وينحفظ في السجل وش تغيّر.</div>' : '<div class="muted small">كل ما كان الطلب أوضح من البداية، قلّت جولات التعديل.</div>'}
+   <div class="grid2">
+   <div class="field"><label for="rKind">النوع</label><select id="rKind" ${edit ? 'disabled' : ''}>${Object.entries(REQ_KINDS).filter(([k]) => k !== 'quota').map(([k, n]) => `<option value="${k}" ${k === k0 ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+   <div class="field"><label for="rTo">مطلوب من</label><select id="rTo">${memOpts(edit ? r.to_member : designer && designer.id)}</select></div>
+   <div class="field"><label for="rTitle">العنوان *</label><input type="text" id="rTitle" placeholder="مثال: بنر هيرش سيطرة للمتجر" value="${edit ? esc(r.title) : ''}"></div>
+   <div class="field"><label for="rDue">الموعد *</label><input type="date" id="rDue" min="${edit ? '' : today()}" value="${edit && r.due ? r.due : ''}"></div>
+   <div class="field"><label for="rSize">المقاس أو المنصة</label><input type="text" id="rSize" placeholder="مثال: 1080×1920 ستوري" value="${edit ? esc(r.size) : ''}"></div>
+   <div class="field"><label for="rRef">مرجع (رابط أو وصف)</label><input type="text" id="rRef" dir="auto" placeholder="https://..." value="${edit ? esc(r.ref_url) : ''}"></div></div>
+   <div class="field"><label for="rDet">وش المطلوب بالضبط؟ *</label><textarea id="rDet" rows="5" placeholder="${esc(DET_HINT[k0] || DET_HINT.other)}">${edit ? esc(r.details) : ''}</textarea></div>
+   <div class="row"><button class="btn primary" id="rSave" type="button">${edit ? 'حفظ التعديل وإبلاغه' : 'إرسال الطلب'}</button><button class="btn" id="rCancel" type="button">إلغاء</button></div>`, () => {
+    const kind = $('rKind'); kind.onchange = () => { const map = { design: 'design', ship: 'shipper', ad: 'media', snap: 'snap', social: 'social' }; const m = active().find(x => (x.roles || []).includes(map[kind.value] || '')); if (m) $('rTo').value = m.id; $('rDet').placeholder = DET_HINT[kind.value] || DET_HINT.other; };
+    $('rCancel').onclick = () => edit ? openReq(r.id) : closeModal();
+    $('rSave').onclick = async () => {
+      const f = { to_member: $('rTo').value, title: $('rTitle').value.trim(), due: $('rDue').value || null, size: $('rSize').value.trim(), ref_url: $('rRef').value.trim(), details: $('rDet').value.trim() };
+      if (!f.title) return toast('اكتب عنوان الطلب', true); if (!f.details) return toast('اكتب وش المطلوب بالضبط', true); if (!f.due) return toast('حدد الموعد', true);
+      $('rSave').disabled = true;
+      if (!edit) {
+        const x = await saveReq(null, { ...f, kind: kind.value, from_member: S.me.id }); if (!x) { $('rSave').disabled = false; return; }
+        await addEv(x, 'created', f.details); toast('انرسل الطلب، وبيوصله إشعار'); closeModal(); render(); return;
+      }
+      const L = { to_member: 'المسؤول', title: 'العنوان', due: 'الموعد', size: 'المقاس', ref_url: 'المرجع', details: 'المطلوب' };
+      const diff = Object.keys(L).filter(k => String(f[k] || '') !== String(r[k] || '')).map(k => k === 'details' ? `المطلوب صار:\n${f.details}` : `${L[k]}: ${k === 'to_member' ? memName(r[k]) : (r[k] || '—')} ← ${k === 'to_member' ? memName(f[k]) : (f[k] || '—')}`);
+      if (!diff.length) { toast('ما تغيّر شي'); return openReq(r.id); }
+      const x = await reqAct(r, f, 'edit', diff.join('\n')); if (x) { toast('انحفظ التعديل وانبلغ'); openReq(x.id); } else $('rSave').disabled = false;
+    };
   });
-};
+}
+$('newReq').onclick = () => reqForm(null);
+
+function reqRow(r) {
+  const late = r.due && r.due < today() && !['done', 'cancelled'].includes(r.status) ? 'late' : r.due === today() ? 'soon' : '';
+  const u = unread(r), ll = lastLine(r);
+  return `<div class="qrow ${late} ${u ? 'unread' : ''}"><span>${u ? '<i class="dot" title="تحديث جديد"></i>' : ''}</span><div><div class="t">${esc(r.title)}${r.rounds ? ` <span class="pill warn">تعديل ${r.rounds}</span>` : ''}</div><div class="sub">${esc([REQ_KINDS[r.kind], 'من ' + memName(r.from_member), r.to_member ? 'إلى ' + memName(r.to_member) : '', r.due ? 'الموعد ' + r.due : ''].filter(Boolean).join(' · '))}</div>${ll ? `<div class="sub">${u ? '<b>جديد:</b> ' : 'آخر حدث: '}${esc(ll)}</div>` : ''}</div><div class="acts row" style="gap:6px"><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span><button class="btn sm" data-req="${r.id}" type="button">افتح</button></div></div>`;
+}
 function renderReqs() {
   const sc = $('rScope').value, dn = $('rDone').checked, me = S.me.id;
-  const L = S.reqs.filter(r => (sc === 'all' || (sc === 'to' ? (r.to_member === me || (r.kind === 'quota' && isApprover())) : r.from_member === me)) && (dn || !['done', 'cancelled'].includes(r.status)));
+  const L = S.reqs.filter(r => (sc === 'all' || (sc === 'me' ? involved(r) : sc === 'to' ? (r.to_member === me || (r.kind === 'quota' && isApprover())) : r.from_member === me)) && (dn || !['done', 'cancelled'].includes(r.status) || unread(r)))
+    .sort((a, b) => (unread(b) - unread(a)) || (tms(b.last_event_at || b.created_at) - tms(a.last_event_at || a.created_at)));
   $('rList').innerHTML = L.length ? `<div style="display:grid;gap:8px">${L.map(reqRow).join('')}</div>` : '<div class="empty">ما فيه طلبات هنا.</div>';
+  const nb = $('notifBtn'); if (nb) nb.hidden = !('Notification' in window) || Notification.permission !== 'default';
 }
 ['rScope', 'rDone'].forEach(id => $(id).addEventListener('input', renderReqs));
 $('rList').addEventListener('click', e => { const b = e.target.closest('[data-req]'); if (b) openReq(b.dataset.req); });
-const RES_HINT = { design: 'حط رابط التصميم (درايف أو كانفا) وأي ملاحظة.', ad: 'اكتب اسم الإعلان أو الحملة في مدير الإعلانات، والمنصة، ووقت التشغيل. ولو عندك رابط حطه.', snap: 'اكتب وش سوّيت (مثلاً: تواصلت مع المشهور واتفقنا على موعد النشر) وحط الرابط لو فيه.', ship: 'اكتب رقم الشحنة أو شركة الشحن وأي ملاحظة.', social: 'حط رابط المنشور أو المحتوى وأي ملاحظة.', other: 'اكتب وش سوّيت، وحط رابط لو فيه (ملف، صورة، منشور).' };
-const links = s => ((s || '').match(/https?:\/\/[^\s<>"']+/g) || []);
-function openReq(id) {
+if ($('notifBtn')) $('notifBtn').onclick = async () => { try { await Notification.requestPermission(); } catch (e) { } renderReqs(); };
+
+async function openReq(id) {
   const r = S.reqs.find(x => x.id === id); if (!r) return; const me = S.me.id, isTo = r.to_member === me || isAdmin(), isFrom = r.from_member === me || isAdmin();
-  const quota = r.kind === 'quota', canQ = quota && isApprover() && !['done', 'cancelled'].includes(r.status);
-  modal(`<div class="row between"><div><h2>${esc(r.title)}</h2><div class="muted small">${esc(REQ_KINDS[r.kind])} · من ${esc(memName(r.from_member))}${r.to_member ? ' إلى ' + esc(memName(r.to_member)) : ''} · ${r.due ? 'الموعد ' + r.due : 'بدون موعد'}</div></div><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></div>
-   ${r.details ? `<div class="note" style="white-space:pre-wrap">${esc(r.details)}</div>` : ''}
-   ${quota ? `<div class="small">الحصة الحالية: ${quotaOf(r.campaign_id, r.from_member)} · المطلوب زيادة: ${r.qty}</div>` : `
-   <div class="small">${r.size ? 'المقاس: ' + esc(r.size) + ' · ' : ''}${r.ref_url ? (links(r.ref_url).length ? links(r.ref_url).map(u => `<a href="${esc(u)}" target="_blank" rel="noopener">المرجع</a>`).join(' ') : 'المرجع: ' + esc(r.ref_url)) : ''}${r.rounds ? ` · <span class="pill warn">${r.rounds} جولة تعديل</span>` : ''}</div>
-   ${isTo && ['new', 'doing'].includes(r.status) ? `<div class="field"><label for="qRes">وش سلّمت؟</label><textarea id="qRes" placeholder="${esc(RES_HINT[r.kind] || RES_HINT.other)}">${esc(r.result_url)}</textarea><div class="muted small">${esc(RES_HINT[r.kind] || RES_HINT.other)}</div></div>` : r.result_url ? `<div class="field"><label>التسليم</label><div class="note" style="white-space:pre-wrap">${esc(r.result_url)}</div></div>` : ''}
-   ${links(r.result_url).map((u, n) => `<a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener">افتح الرابط${links(r.result_url).length > 1 ? ' ' + (n + 1) : ''}</a>`).join(' ')}`}
-   <div class="row">
-    ${canQ ? '<button class="btn good" data-q="qok" type="button">موافقة وزيادة الحصة</button><button class="btn danger" data-q="qno" type="button">رفض</button>' : ''}
-    ${!quota && isTo && r.status === 'new' ? '<button class="btn" data-q="doing" type="button">بدأت فيه</button>' : ''}
-    ${!quota && isTo && ['new', 'doing'].includes(r.status) ? '<button class="btn primary" data-q="review" type="button">سلّمت، أرسل للمراجعة</button>' : ''}
-    ${!quota && isFrom && r.status === 'review' ? '<button class="btn good" data-q="done" type="button">اعتماد التسليم</button><button class="btn danger" data-q="fix" type="button">يرجع للتعديل</button>' : ''}
-    ${isFrom && !['done', 'cancelled'].includes(r.status) ? '<button class="btn sm" data-q="cancel" type="button">إلغاء الطلب</button>' : ''}
-    <button class="btn" id="qClose" type="button">إغلاق</button></div>`, root => {
-    $('qClose').onclick = closeModal;
-    root.addEventListener('click', async e => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q; b.disabled = true;
-      if (k === 'qok') { const cur = quotaOf(r.campaign_id, r.from_member); const up = await q(sb.from('quotas').upsert({ campaign_id: r.campaign_id, member_id: r.from_member, quota: cur + (r.qty || 0), updated_by: me }).select().single()); if (!up) { b.disabled = false; return; } const kq = S.quotas.findIndex(y => y.campaign_id === up.campaign_id && y.member_id === up.member_id); if (kq >= 0) S.quotas[kq] = up; else S.quotas.push(up); if (await saveReq(r.id, { status: 'done', done_at: nowIso(), result_url: '' })) { toast(`زادت الحصة إلى ${up.quota}`); openReq(r.id); } return; }
-      if (k === 'qno') { const why = await reasonBox('سبب الرفض', false); if (why == null) { b.disabled = false; return; } if (await saveReq(r.id, { status: 'cancelled', details: (r.details ? r.details + '\n' : '') + 'رد متعب: ' + why.trim() })) { toast('انرفض الطلب'); openReq(r.id); } return; }
-      const ch = { doing: { status: 'doing', started_at: nowIso() }, review: { status: 'review', result_url: ($('qRes') || {}).value ? $('qRes').value.trim() : '', started_at: r.started_at || nowIso() }, done: { status: 'done', done_at: nowIso() }, fix: { status: 'doing', rounds: (r.rounds || 0) + 1 }, cancel: { status: 'cancelled' } }[k];
-      if (k === 'fix') { const why = await reasonBox('وش المطلوب تعديله؟', false); if (why == null || !why.trim()) { b.disabled = false; return; } ch.details = (r.details ? r.details + '\n' : '') + 'تعديل ' + ((r.rounds || 0) + 1) + ': ' + why.trim(); }
-      if (k === 'review' && !ch.result_url) { b.disabled = false; return toast('اكتب وش سلّمت في خانة «وش سلّمت؟»', true); }
-      if (await saveReq(r.id, ch)) { toast('انحفظ'); openReq(r.id); } else b.disabled = false; });
+  const { data: E0, error: eE } = await sb.from('request_events').select('*').eq('request_id', id).order('created_at'); const E = E0 || []; if (eE) S.noEv = true;
+  const quota = r.kind === 'quota', canQ = quota && isApprover() && !['done', 'cancelled'].includes(r.status), open = !['done', 'cancelled'].includes(r.status);
+  let dn = 0; const evHtml = E.map(e => { const lbl = e.type === 'deliver' ? (++dn === 1 ? 'سلّم' : `سلّم التعديل ${dn - 1}`) : EV[e.type] || e.type;
+    return `<div class="ev ${EV_CLS[e.type] || ''}"><div class="h"><b>${esc(memName(e.member_id))}</b> <span class="pill ${EV_CLS[e.type] || ''}">${esc(lbl)}</span><span class="muted small" title="${esc(e.created_at)}">${dtFull(e.created_at)}</span></div>${e.body ? `<div class="b">${linkify(e.body)}</div>` : ''}</div>`; }).join('');
+  const steps = ['انطلب', 'قيد التنفيذ', 'بانتظار المراجعة', 'معتمد'], si = { new: 0, doing: 1, fix: 1, review: 2, done: 3, cancelled: -1 }[r.status];
+  const prog = r.status === 'cancelled' ? '' : `<div class="stepper s4">${steps.map((s, j) => `<div class="st ${j < si || si === 3 ? 'd' : j === si ? 'c' : ''}"><b></b><span>${j === 1 && r.status === 'fix' ? 'يتعدّل' : s}</span></div>`).join('')}</div>`;
+  const canDeliver = !quota && isTo && ['new', 'doing', 'fix'].includes(r.status);
+  const lastFix = [...E].reverse().find(e => e.type === 'fix' || e.type === 'reopen');
+  modal(`<div class="row between"><div><h2>${esc(r.title)}</h2><div class="muted small">${esc(REQ_KINDS[r.kind])} · من ${esc(memName(r.from_member))}${r.to_member ? ' إلى ' + esc(memName(r.to_member)) : ''} · ${r.due ? 'الموعد ' + r.due : 'بدون موعد'}${r.rounds ? ' · ' + r.rounds + ' جولة تعديل' : ''}</div></div><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></div>
+   ${prog}
+   ${quota ? `<div class="small">الحصة الحالية: ${quotaOf(r.campaign_id, r.from_member)} · المطلوب زيادة: ${r.qty}</div>` : `<div class="card"><div class="hd"><b>الطلب</b>${isFrom && open ? '<button class="btn sm" data-q="edit" type="button" style="margin-inline-start:auto">تعديل الطلب</button>' : ''}</div>
+     <div style="white-space:pre-wrap">${linkify(r.details) || '<span class="muted">بدون تفاصيل</span>'}</div>
+     <div class="small muted">${r.size ? 'المقاس: ' + esc(r.size) : ''}${r.size && r.ref_url ? ' · ' : ''}${r.ref_url ? 'المرجع: ' + linkify(r.ref_url) : ''}</div></div>`}
+   <h3 style="margin:4px 0 0">السجل</h3><div class="tl">${evHtml || (S.noEv ? '<div class="note">السجل يشتغل بعد تشغيل تحديث قاعدة البيانات رقم 3.</div>' : '<div class="muted small">ما فيه أحداث.</div>')}</div>
+   ${canDeliver ? `<div class="card ${r.status === 'fix' ? 'warnc' : ''}"><div class="hd"><b>${r.status === 'fix' ? 'المطلوب تعديله' : 'التسليم'}</b></div>
+     ${r.status === 'fix' && lastFix ? `<div class="note" style="white-space:pre-wrap">${linkify(lastFix.body)}</div>` : ''}
+     <div class="field"><label for="qRes">${r.status === 'fix' ? 'وش عدّلت؟ (حط الرابط الجديد)' : 'وش سلّمت؟'}</label><textarea id="qRes" rows="3" placeholder="${esc(RES_HINT[r.kind] || RES_HINT.other)}"></textarea></div>
+     <div class="row">${r.status === 'new' ? '<button class="btn" data-q="doing" type="button">بدأت فيه</button>' : ''}<button class="btn primary" data-q="review" type="button">${r.status === 'fix' ? 'سلّم التعديل وأرسل للمراجعة' : 'سلّم وأرسل للمراجعة'}</button></div></div>` : ''}
+   ${!quota && isFrom && r.status === 'review' ? `<div class="card"><div class="hd"><b>راجع التسليم</b></div><div class="row"><button class="btn good" data-q="done" type="button">اعتماد التسليم</button><button class="btn danger" data-q="fix" type="button">يرجع للتعديل</button></div></div>` : ''}
+   ${canQ ? '<div class="row"><button class="btn good" data-q="qok" type="button">موافقة وزيادة الحصة</button><button class="btn danger" data-q="qno" type="button">رفض</button></div>' : ''}
+   ${r.status !== 'cancelled' && (involved(r) || isAdmin()) ? `<div class="field"><label for="qMsg">ردّ أو ملاحظة</label><textarea id="qMsg" rows="2" placeholder="سؤال، توضيح، أو أي ملاحظة. توصل إشعار للطرف الثاني."></textarea></div>` : ''}
+   <div class="row">${r.status !== 'cancelled' && (involved(r) || isAdmin()) ? '<button class="btn" data-q="msg" type="button">إرسال الرد</button>' : ''}
+    ${!quota && isFrom && r.status === 'done' ? '<button class="btn sm" data-q="reopen" type="button">إعادة فتح للتعديل</button>' : ''}
+    ${isFrom && open ? '<button class="btn sm" data-q="cancel" type="button">إلغاء الطلب</button>' : ''}
+    <button class="btn" id="qClose" type="button" style="margin-inline-start:auto">إغلاق</button></div>`, root => {
+    $('qClose').onclick = () => { closeModal(); render(); };
+    const tl = root.querySelector('.tl'); if (tl) tl.scrollTop = tl.scrollHeight;
+    root.addEventListener('click', async e => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q;
+      if (k === 'edit') return reqForm(r);
+      b.disabled = true; const done = msg => { toast(msg); openReq(r.id); }; const fail = () => { b.disabled = false; };
+      if (k === 'msg') { const t = $('qMsg').value.trim(); if (!t) { fail(); return toast('اكتب الرد', true); } return (await addEv(r, 'comment', t)) ? done('انرسل الرد') : fail(); }
+      if (k === 'doing') return (await reqAct(r, { status: 'doing', started_at: nowIso() }, 'start', '')) ? done('انسجّل إنك بدأت') : fail();
+      if (k === 'review') { const t = $('qRes').value.trim(); if (!t) { fail(); return toast(r.status === 'fix' ? 'اكتب وش عدّلت' : 'اكتب وش سلّمت', true); }
+        return (await reqAct(r, { status: 'review', result_url: t, started_at: r.started_at || nowIso() }, 'deliver', t)) ? done('انرسل للمراجعة') : fail(); }
+      if (k === 'done') return (await reqAct(r, { status: 'done', done_at: nowIso() }, 'approve', '')) ? done('اعتمدت التسليم') : fail();
+      if (k === 'fix' || k === 'reopen') { const why = await reasonBox('وش المطلوب تعديله بالضبط؟', true); if (why == null || !why.trim()) return fail();
+        return (await reqAct(r, { status: 'fix', rounds: (r.rounds || 0) + 1, done_at: null }, k, why.trim())) ? done('رجع للتعديل، وبيوصله إشعار') : fail(); }
+      if (k === 'cancel') { if (!await confirmBox('تلغي هذا الطلب؟')) return fail(); return (await reqAct(r, { status: 'cancelled' }, 'cancel', '')) ? done('انلغى الطلب') : fail(); }
+      if (k === 'qok') { const cur = quotaOf(r.campaign_id, r.from_member); const up = await q(sb.from('quotas').upsert({ campaign_id: r.campaign_id, member_id: r.from_member, quota: cur + (r.qty || 0), updated_by: me }).select().single()); if (!up) return fail(); const kq = S.quotas.findIndex(y => y.campaign_id === up.campaign_id && y.member_id === up.member_id); if (kq >= 0) S.quotas[kq] = up; else S.quotas.push(up);
+        return (await reqAct(r, { status: 'done', done_at: nowIso() }, 'quota_ok', `الحصة صارت ${up.quota}`)) ? done('زادت الحصة') : fail(); }
+      if (k === 'qno') { const why = await reasonBox('سبب الرفض', false); if (why == null) return fail(); return (await reqAct(r, { status: 'cancelled' }, 'quota_no', why.trim())) ? done('انرفض الطلب') : fail(); }
+    });
   });
+  await markRead(r);
 }
+
+/* ===== الإشعارات: كل 30 ثانية نشيك على الطلبات اللي تغيّرت ===== */
+function notifyReq(r) {
+  const msg = `${memName(r.last_event_by)} ${EV[r.last_event_type] || 'حدّث'}: ${r.title}`;
+  toast(msg);
+  try { if ('Notification' in window && Notification.permission === 'granted' && document.hidden) { const n = new Notification('أداء فريق العز', { body: msg, tag: r.id }); n.onclick = () => { window.focus(); openReq(r.id); }; } } catch (e) { }
+}
+async function pollReqs() {
+  if (!S.me || !S.user) return;
+  const since = new Date(tms(S.lastPoll || nowIso()) - 120000).toISOString(); S.lastPoll = nowIso();
+  const { data } = await sb.from('requests').select('*').gt('updated_at', since); if (!data || !data.length) return;
+  let changed = false;
+  for (const row of data) { upsertLocal(S.reqs, row); changed = true;
+    if (unread(row) && S.notified[row.id] !== row.last_event_at) { S.notified[row.id] = row.last_event_at; notifyReq(row);
+      const ov = $('ov'); if (!ov.hidden && ov.querySelector('#qClose') && ov.innerHTML.includes(esc(row.title)) && !(($('qRes') || {}).value || ($('qMsg') || {}).value)) openReq(row.id); } }
+  if (changed) { if ($('ov').hidden) render(); else updateMineCount(); }
+}
+setInterval(pollReqs, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReqs(); });
 
 /* ================= تقرير اليوم ================= */
 $('tDate').value = today(); $('tDate').addEventListener('change', renderToday);

@@ -6,7 +6,7 @@
 <title>أداء فريق العز</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20261103e">
+<link rel="stylesheet" href="assets/style.css?v=20261104b">
 </head>
 <body>
 
@@ -49,7 +49,7 @@
     <a href="#acq" data-v="acq">الاستقطاب</a>
     <a href="#camps" data-v="camps">الحملات</a>
     <a href="#pipe" data-v="pipe">خط الإنتاج</a>
-    <a href="#req" data-v="req">الطلبات</a>
+    <a href="#req" data-v="req">الطلبات<span class="cnt" id="reqCnt" hidden></span></a>
     <a href="#today" data-v="today">تقرير اليوم</a>
     <a href="#dash" data-v="dash" class="adm">لوحة الأداء</a>
     <a href="#setup" data-v="setup" class="adm">الإعدادات</a>
@@ -95,9 +95,9 @@
   </section>
 
   <section id="v-req" class="view" hidden>
-    <div class="panel"><div class="row between"><div><h2>الطلبات</h2><div class="muted small">أي شغل تبيه من زميل (تصميم، شحن، إطلاق إعلان...) يُطلب من هنا بدل الواتساب، وله صاحب وموعد.</div></div>
-      <div class="row"><div class="field"><label for="rScope">اعرض</label><select id="rScope"><option value="to">المطلوب مني</option><option value="from">طلباتي من غيري</option><option value="all">الكل</option></select></div>
-      <label class="check small"><input type="checkbox" id="rDone"> أظهر المنتهية</label></div></div></div>
+    <div class="panel"><div class="row between"><div><h2>الطلبات</h2><div class="muted small">أي شغل تبيه من زميل (تصميم، شحن، إطلاق إعلان...) يُطلب من هنا بدل الواتساب. كل طلب له سجل مرتب بكل الردود والتعديلات والتسليمات، وأي تحديث يوصل إشعار للطرف الثاني.</div></div>
+      <div class="row"><div class="field"><label for="rScope">اعرض</label><select id="rScope"><option value="me">كل اللي يخصني</option><option value="to">المطلوب مني</option><option value="from">طلباتي من غيري</option><option value="all">الكل</option></select></div>
+      <label class="check small"><input type="checkbox" id="rDone"> أظهر المنتهية</label><button class="btn sm" id="notifBtn" type="button" hidden>فعّل إشعارات المتصفح</button></div></div></div>
     <div id="rList"></div>
   </section>
 
@@ -143,7 +143,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="assets/config.js?v=20261103e"></script>
-<script src="assets/app.js?v=20261103e"></script>
+<script src="assets/config.js?v=20261104b"></script>
+<script src="assets/app.js?v=20261104b"></script>
 </body>
 </html>

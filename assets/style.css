@@ -115,3 +115,15 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--sunk)}
 @media (max-width:640px){.contact{grid-template-columns:1fr 1fr}}
 .prog{height:8px;border-radius:5px;background:var(--sunk);overflow:hidden;min-width:80px}
 .prog i{display:block;height:100%;background:var(--good)}
+
+/* سجل الطلب */
+.stepper.s4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.tl{display:grid;gap:10px;border-inline-start:2px solid var(--line);padding-inline-start:12px;max-height:46vh;overflow:auto}
+.ev{display:grid;gap:6px;position:relative}
+.ev::before{content:"";position:absolute;inset-inline-start:-18px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--line)}
+.ev.good::before{background:var(--good)}.ev.bad::before{background:var(--bad)}.ev.warn::before{background:var(--warn)}.ev.acc::before{background:var(--accent)}
+.ev .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.ev .b{white-space:pre-wrap;overflow-wrap:anywhere;background:var(--sunk);border-radius:8px;padding:8px 10px;font-size:14px}
+.card.warnc{border-inline-start:4px solid var(--bad)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--bad)}
+.qrow.unread{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
