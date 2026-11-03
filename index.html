@@ -46,6 +46,8 @@
   </div>
   <nav class="tabs" id="tabs">
     <a href="#mine" data-v="mine">مهامي<span class="cnt" id="mineCnt" hidden></span></a>
+    <a href="#acq" data-v="acq">الاستقطاب</a>
+    <a href="#camps" data-v="camps">الحملات</a>
     <a href="#pipe" data-v="pipe">خط الإنتاج</a>
     <a href="#req" data-v="req">الطلبات</a>
     <a href="#today" data-v="today">تقرير اليوم</a>
@@ -59,6 +61,25 @@
     <div class="panel"><div class="row between"><div><h2 id="mineTitle">مهامي</h2><div class="muted small" id="mineSub"></div></div>
       <div class="field adm" style="min-width:200px"><label for="mineAs">اعرض مهام</label><select id="mineAs"></select></div></div></div>
     <div id="mineBody" style="display:grid;gap:16px"></div>
+  </section>
+
+  <section id="v-acq" class="view" hidden>
+    <div class="panel"><div class="row between"><div><h2>الاستقطاب</h2><div class="muted small">كل مؤثر له ملف واحد: بيانات الترشيح، ثم اعتماد متعب، ثم التواصل والتفاوض، ثم الحملات اللي دخلها.</div></div>
+      <button class="btn primary" id="acqNew" type="button">+ استقطاب جديد</button></div>
+      <div class="row">
+        <div class="field" style="flex:1 1 200px"><label for="aQ">بحث</label><input type="search" id="aQ" placeholder="الاسم، اليوزر، الجوال، الرابط"></div>
+        <div class="field" style="flex:1 1 150px"><label for="aSt">الحالة</label><select id="aSt"><option value="">الكل</option><option value="draft">مسودة</option><option value="pending">بانتظار المراجعة</option><option value="needs_edit">يحتاج تعديل</option><option value="approved">معتمد</option><option value="agreed">تم الاتفاق</option><option value="rejected">مرفوض</option><option value="none">من الحملات</option></select></div>
+        <div class="field" style="flex:1 1 150px"><label for="aMem">المرشِّح</label><select id="aMem"></select></div>
+        <div class="field" style="flex:1 1 150px"><label for="aType">نوع الحساب</label><select id="aType"></select></div>
+      </div></div>
+    <div id="aList"></div>
+  </section>
+
+  <section id="v-camps" class="view" hidden>
+    <div class="panel"><div class="row between"><div><h2>الحملات</h2><div class="muted small">عبدالمحسن يحدد العدد المطلوب لكل حملة، ومتعب يوزّعه على الموظفين. كل موظف يشوف حصته ويرشّح منها.</div></div>
+      <button class="btn primary adm" id="campAdd" type="button">+ حملة</button></div>
+      <label class="check small"><input type="checkbox" id="cEnded"> أظهر الحملات المنتهية</label></div>
+    <div id="cList" style="display:grid;gap:16px"></div>
   </section>
 
   <section id="v-pipe" class="view" hidden>
@@ -97,6 +118,8 @@
     <div class="tiles" id="dTiles"></div>
     <div class="panel"><h3>المراحل: وين يتأخر الشغل؟</h3><div class="tw" id="dSteps"></div>
       <div class="note">«مفتوح» = ملفات واقفة عند المرحلة الحين. «متأخر» = تجاوز المدة المسموحة. «وسيط الأيام» = نصف الملفات خلصت المرحلة خلال هذي المدة أو أقل. أعلى وسيط هو عنق الزجاجة.</div></div>
+    <div class="panel"><h3>الاستقطاب حسب الموظف</h3><div class="tw" id="dAcq"></div>
+      <div class="note">«نسبة القبول» = المعتمد ÷ اللي قرّر فيه متعب. «وفّرنا» = الفرق بين السعر قبل التفاوض وبعده للحسابات اللي تم الاتفاق معها في الفترة.</div></div>
     <div class="panel"><h3>صناع المحتوى</h3><div class="tw" id="dCreators"></div>
       <div class="note">«الإنجاز» = اللي نشروا ÷ اللي وصلهم المنتج. «أكواد كاملة» = نسبة المنشور اللي فيه كل أكواد منصاته. «أيام للنشر» = وسيط الأيام من وصول المنتج للنشر، وهذا الجزء اللي بيد الصانع.</div></div>
     <div class="panel"><h3>الطلبات حسب المسؤول</h3><div class="tw" id="dReqs"></div></div>
@@ -104,7 +127,6 @@
 
   <section id="v-setup" class="view" hidden>
     <div class="panel"><h2>الفريق والأدوار</h2><div class="muted small">كل شخص يسجّل من صفحة الدخول، وأنت تفعّله وتحدد دوره هنا. الدور يحدد وش يطلع له في «مهامي».</div><div class="tw" id="sMembers"></div></div>
-    <div class="panel"><div class="row between"><h2>الحملات</h2><button class="btn" id="sCampAdd" type="button">+ حملة</button></div><div id="sCamps" style="display:grid;gap:8px"></div></div>
     <div class="panel"><h2>المدة المسموحة لكل مرحلة (أيام)</h2><div class="grid3" id="sSla"></div><div><button class="btn primary" id="sSlaSave" type="button">حفظ المدد</button></div></div>
     <div class="panel"><h2>قائمة تقرير اليوم لكل دور</h2><div class="muted small">سطر لكل مهمة. صناع المحتوى ما يحتاجون قائمة لأن شغلهم ينحسب من خط الإنتاج.</div><div class="grid2" id="sTasks"></div><div><button class="btn primary" id="sTasksSave" type="button">حفظ القوائم</button></div></div>
     <div class="panel"><h2>البيانات البنكية</h2><div id="sBank"></div></div>
@@ -112,6 +134,8 @@
 </main>
 </div>
 
+<datalist id="dlCountries"><option>السعودية</option><option>الإمارات</option><option>الكويت</option><option>قطر</option><option>البحرين</option><option>عُمان</option><option>مصر</option><option>الأردن</option><option>العراق</option><option>لبنان</option><option>المغرب</option><option>الجزائر</option><option>تونس</option><option>تركيا</option><option>بريطانيا</option><option>أمريكا</option></datalist>
+<datalist id="dlCities"><option>الرياض</option><option>جدة</option><option>مكة</option><option>المدينة المنورة</option><option>الدمام</option><option>الخبر</option><option>الظهران</option><option>الأحساء</option><option>القطيف</option><option>الجبيل</option><option>الطائف</option><option>أبها</option><option>خميس مشيط</option><option>تبوك</option><option>بريدة</option><option>عنيزة</option><option>حائل</option><option>جازان</option><option>نجران</option><option>الباحة</option><option>ينبع</option><option>الخرج</option><option>حفر الباطن</option><option>عرعر</option><option>سكاكا</option><option>دبي</option><option>أبوظبي</option><option>الشارقة</option><option>العين</option><option>الكويت</option><option>الدوحة</option><option>المنامة</option><option>مسقط</option></datalist>
 <div id="toast" class="toast" hidden role="status"></div>
 <div id="ov" class="ov" hidden></div>
 

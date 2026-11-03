@@ -100,3 +100,18 @@ tr.click{cursor:pointer}tr.click:hover{background:var(--sunk)}
 .task{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
 .task.done{background:var(--good-soft);border-color:transparent}
 @media (max-width:640px){.qrow{grid-template-columns:auto 1fr}.qrow .acts{grid-column:1/-1}.st span{display:none}}
+.card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);padding:14px;display:grid;gap:10px}
+.card.ok{border-inline-start:4px solid var(--good)}.card.part{border-inline-start:4px solid var(--warn)}
+.card .hd{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card .hd b{font-family:var(--f-display)}
+.locked{position:relative;opacity:.55;pointer-events:none}
+.lockmsg{background:var(--sunk);border-radius:8px;padding:12px;text-align:center;color:var(--muted);font-weight:600}
+.chooser{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.chooser button{text-align:right;display:grid;gap:4px;padding:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);cursor:pointer;font:inherit;color:inherit}
+.chooser button:hover{border-color:var(--accent)}
+.chooser b{font-family:var(--f-display);font-size:16px}
+.plats{display:flex;gap:12px;flex-wrap:wrap}
+.contact{display:grid;grid-template-columns:auto 1fr 1fr 1fr auto;gap:8px;align-items:end}
+@media (max-width:640px){.contact{grid-template-columns:1fr 1fr}}
+.prog{height:8px;border-radius:5px;background:var(--sunk);overflow:hidden;min-width:80px}
+.prog i{display:block;height:100%;background:var(--good)}
