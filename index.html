@@ -6,7 +6,7 @@
 <title>أداء فريق العز</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20261104c">
+<link rel="stylesheet" href="assets/style.css?v=20261104d">
 </head>
 <body>
 
@@ -21,13 +21,14 @@
     <button class="btn primary" id="aGo" type="button">دخول</button>
     <button class="btn" id="aSwitch" type="button">ما عندك حساب؟ سجّل</button>
     <div class="note" id="aMsg" hidden></div>
+    <button class="btn sm" id="aResend" type="button" hidden>أرسل رابط التأكيد مرة ثانية</button>
   </div>
 </section>
 
 <section id="waitView" class="auth" hidden>
   <div class="panel">
-    <h2>حسابك بانتظار التفعيل</h2>
-    <p style="margin:0">سجّلت بنجاح. عبدالمحسن يفعّل حسابك ويحدد دورك، وبعدها تقدر تشتغل.</p>
+    <h2 id="waitTitle">حسابك بانتظار التفعيل</h2>
+    <p style="margin:0" id="waitText">سجّلت بنجاح. عبدالمحسن يفعّل حسابك ويحدد دورك، وبعدها تقدر تشتغل.</p>
     <button class="btn" id="wRetry" type="button">تحقّق مرة ثانية</button>
     <button class="btn" id="wOut" type="button">خروج</button>
   </div>
@@ -143,7 +144,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="assets/config.js?v=20261104c"></script>
-<script src="assets/app.js?v=20261104c"></script>
+<script src="assets/config.js?v=20261104d"></script>
+<script src="assets/app.js?v=20261104d"></script>
 </body>
 </html>

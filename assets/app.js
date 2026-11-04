@@ -57,6 +57,18 @@ function normPhone(s) {
 }
 const handleOf = s => { s = String(s || '').trim(); const m = s.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i); return (m ? m[1] : s.replace(/^@/, '')).replace(/[/?].*$/, '').toLowerCase(); };
 const isUrl = s => !s || /^https?:\/\/\S+\.\S+/.test(s);
+const CONTACT = 'ولو تكررت، تواصل مع عبدالمحسن.';
+function friendly(err) {
+  const m = String((err && (err.message || err.error_description || err.msg)) || err || '');
+  if (/متعب|عبدالمحسن/.test(m)) return m;
+  if (/failed to fetch|networkerror|network request|load failed|timeout/i.test(m) || (typeof navigator !== 'undefined' && navigator.onLine === false)) return 'فيه مشكلة في الاتصال بالإنترنت. تأكد من النت وجرّب مرة ثانية.';
+  if (/jwt|expired|session|refresh token|not authenticated/i.test(m)) return 'انتهت جلستك. سجّل دخول من جديد.';
+  if (/row-level|permission|not allowed|unauthorized|forbidden/i.test(m)) return 'ما عندك صلاحية لهذي الخطوة. إذا تحتاجها تواصل مع عبدالمحسن.';
+  if (/rate limit|too many|429/i.test(m)) return 'محاولات كثيرة ورا بعض. انتظر دقيقة وجرّب مرة ثانية.';
+  if (/duplicate|already exists|unique/i.test(m)) return 'هذا الشي مسجّل من قبل. ابحث عنه بدل ما تضيفه مرة ثانية.';
+  if (/already registered/i.test(m)) return 'هذا الإيميل مسجّل من قبل. ادخل بكلمة المرور بدل التسجيل.';
+  return 'ما قدرنا نكمّل هذي الخطوة. حدّث الصفحة وجرّب مرة ثانية. ' + CONTACT;
+}
 let toastT; function toast(m, bad) { const t = $('toast'); t.textContent = m; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
 async function copyTxt(t) { try { await navigator.clipboard.writeText(t); toast('انسخ'); } catch (e) { toast('ما قدرت أنسخ، ظلّل النص وانسخه', true); } }
 document.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyTxt(b.dataset.copy); });
@@ -64,6 +76,7 @@ const opts = (list, sel) => list.map(v => `<option ${v === sel ? 'selected' : ''
 const optsBlank = (list, sel, blank) => `<option value="">${blank || 'اختر'}</option>` + opts(list, sel);
 
 /* ================= الحالة ================= */
+const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/');
 const S = { reads: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
 const mem = id => S.members.find(m => m.id === id);
 const memName = id => (mem(id) || {}).name || '—';
@@ -113,7 +126,7 @@ const waLink = (phone, txt) => { let p = String(phone || '').replace(/\D/g, '').
 const isContinuing = i => !!i && S.deals.some(d => d.influencer_id === i.id && allDelivered(d));
 
 /* ================= البيانات ================= */
-async function q(p) { const { data, error } = await p; if (error) { console.warn(error); toast(/row-level|لمتعب/.test(error.message) ? (error.message.includes('متعب') ? error.message : 'ما عندك صلاحية لهذي العملية') : 'تعذّر الحفظ: ' + error.message, true); return null; } return data ?? true; }
+async function q(p) { const { data, error } = await p; if (error) { console.warn(error); toast(friendly(error), true); return null; } return data ?? true; }
 async function loadAll() {
   const [m, c, s, d, r, i, qt, rd] = await Promise.all([
     sb.from('members').select('*').order('name'),
@@ -136,7 +149,7 @@ async function saveInfl(id, ch) { const r = id ? await q(sb.from('influencers').
 
 /* ================= الدخول ================= */
 let signUp = false;
-function showAuth() { $('authView').hidden = false; $('appView').hidden = true; $('waitView').hidden = true; }
+function showAuth() { $('authView').hidden = false; $('appView').hidden = true; $('waitView').hidden = true; if (S.authNotice) { $('aMsg').textContent = S.authNotice; $('aMsg').hidden = false; $('aResend').hidden = false; S.authNotice = null; } }
 $('aSwitch').onclick = () => { signUp = !signUp; $('nameWrap').hidden = !signUp; $('aGo').textContent = signUp ? 'سجّل حساب' : 'دخول'; $('aSwitch').textContent = signUp ? 'عندك حساب؟ ادخل' : 'ما عندك حساب؟ سجّل'; $('aMsg').hidden = true; };
 $('aGo').onclick = async () => {
   const email = $('aEmail').value.trim(), password = $('aPass').value, name = $('aName').value.trim();
@@ -144,22 +157,36 @@ $('aGo').onclick = async () => {
   if (!email || password.length < 8) return msg('اكتب الإيميل، وكلمة مرور 8 أحرف أو أكثر.');
   if (signUp && !name) return msg('اكتب اسمك.');
   $('aGo').disabled = true;
-  const r = signUp ? await sb.auth.signUp({ email, password, options: { data: { name } } }) : await sb.auth.signInWithPassword({ email, password });
+  const r = signUp ? await sb.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: APP_URL } }) : await sb.auth.signInWithPassword({ email, password });
   $('aGo').disabled = false;
-  if (r.error) return msg(/Invalid login/.test(r.error.message) ? 'الإيميل أو كلمة المرور غلط.' : /not confirmed/i.test(r.error.message) ? 'أكّد إيميلك أول من الرابط اللي وصلك.' : r.error.message);
-  if (signUp && !r.data.session) return msg('أرسلنا لك رابط تأكيد على الإيميل. افتحه ثم ارجع وادخل.');
+  if (r.error) { if (/not confirmed/i.test(r.error.message)) { $('aResend').hidden = false; return msg('حسابك ما تأكد للحين. افتح رابط التأكيد اللي وصلك على الإيميل (شيّك على الرسائل المزعجة)، أو اضغط «أرسل رابط التأكيد مرة ثانية».'); } return msg(/Invalid login/.test(r.error.message) ? 'الإيميل أو كلمة المرور غلط. تأكد منهم وجرّب مرة ثانية.' : friendly(r.error)); }
+  if (signUp && !r.data.session) { $('aResend').hidden = false; return msg('تم التسجيل. أرسلنا لك رابط تأكيد على الإيميل: افتحه من نفس الجهاز، وبيرجعك للموقع. إذا ما وصلك خلال دقيقتين شيّك على الرسائل المزعجة، أو اضغط «أرسل رابط التأكيد مرة ثانية».'); }
   start();
 };
 $('signOut').onclick = $('wOut').onclick = async () => { await sb.auth.signOut(); location.hash = ''; showAuth(); };
 $('wRetry').onclick = () => start();
+$('aResend').onclick = async () => { const email = $('aEmail').value.trim(); const m = $('aMsg'); if (!email) { m.textContent = 'اكتب إيميلك فوق أول.'; m.hidden = false; return; }
+  $('aResend').disabled = true; const r = await sb.auth.resend({ type: 'signup', email, options: { emailRedirectTo: APP_URL } }); $('aResend').disabled = false;
+  m.textContent = r.error ? friendly(r.error) : 'أرسلنا رابط تأكيد جديد. افتحه من نفس الجهاز خلال ساعة.'; m.hidden = false; };
+/* رسائل رابط التأكيد: لو الرابط انتهى أو انستخدم، نوضح للشخص وش يسوي بدل صفحة خطأ */
+(function authUrlNotice() {
+  const raw = (location.hash || '').replace(/^#/, '') + '&' + (location.search || '').replace(/^\?/, '');
+  const p = new URLSearchParams(raw); const code = p.get('error_code') || p.get('error');
+  if (code) {
+    const txt = /otp_expired|expired/i.test(code + (p.get('error_description') || '')) ? 'رابط التأكيد انتهى أو انفتح قبل. لا تشيل هم: ادخل بإيميلك وكلمة المرور، ولو طلب منك تأكيد اضغط «أرسل رابط التأكيد مرة ثانية».' : 'ما قدرنا نكمّل تأكيد الحساب من الرابط. ادخل بإيميلك وكلمة المرور، ' + CONTACT;
+    S.authNotice = txt; history.replaceState(null, '', APP_URL);
+  } else if (/access_token|type=signup|type=recovery/.test(raw)) S.justConfirmed = true;
+})();
 
-async function start() {
+async function start() { try { await startInner(); } catch (e) { console.warn(e); $('authView').hidden = true; $('appView').hidden = true; $('waitView').hidden = false; $('waitTitle').textContent = 'ما قدرنا نفتح الموقع'; $('waitText').textContent = friendly(e); } }
+async function startInner() {
   const { data } = await sb.auth.getSession();
   if (!data.session) return showAuth();
   S.user = data.session.user;
   const { data: me } = await sb.from('members').select('*').eq('id', S.user.id).maybeSingle();
   S.me = me;
-  if (!me || !me.active) { $('authView').hidden = true; $('appView').hidden = true; $('waitView').hidden = false; return; }
+  if (S.justConfirmed || /access_token/.test(location.hash)) { S.justConfirmed = false; history.replaceState(null, '', APP_URL); }
+  if (!me || !me.active) { $('authView').hidden = true; $('appView').hidden = true; $('waitView').hidden = false; $('waitTitle').textContent = 'حسابك بانتظار التفعيل'; $('waitText').textContent = 'تم تأكيد إيميلك وتسجيلك بنجاح. عبدالمحسن يفعّل حسابك ويحدد دورك، وبعدها تقدر تشتغل. ارجع بعد شوي واضغط «تحقّق مرة ثانية».'; return; }
   $('authView').hidden = true; $('waitView').hidden = true; $('appView').hidden = false;
   try { const k = localStorage.getItem('alezz_bank_priv'); if (k && isAdmin()) S.bankPriv = JSON.parse(k); } catch (e) { }
   await loadAll();
@@ -780,7 +807,7 @@ async function markRead(r) { if (S.noEv) return; const t = new Date(Math.max(Dat
 async function addEv(r, type, body) {
   if (S.noEv) return { created_at: nowIso() };
   const { data: e, error } = await sb.from('request_events').insert({ request_id: r.id, member_id: S.me.id, type, body: body || '' }).select().single();
-  if (error) { if (/request_events|relation|schema cache/i.test(error.message)) { S.noEv = true; console.warn('تحديث قاعدة البيانات 003 ما انشغّل'); return { created_at: nowIso() }; } toast('تعذّر تسجيل الحدث: ' + error.message, true); return null; }
+  if (error) { if (/request_events|relation|schema cache/i.test(error.message)) { S.noEv = true; console.warn('تحديث قاعدة البيانات 003 ما انشغّل'); return { created_at: nowIso() }; } toast(friendly(error), true); return null; }
   if (e) { Object.assign(r, { last_event_at: e.created_at, last_event_by: S.me.id, last_event_type: type }); await markRead(r); }
   return e;
 }
@@ -994,5 +1021,10 @@ $('sTasksSave').onclick = async () => { const v = {}; Object.keys(ROLES).filter(
 
 /* ================= التشغيل ================= */
 sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') showAuth(); });
+/* أي خطأ غير متوقع: رسالة مفهومة بدل ما يتعطل بصمت */
+let lastErrT = 0; const softErr = e => { console.warn(e); const msg = String((e && (e.message || (e.reason && e.reason.message))) || ''); if ((e && e.filename && !e.filename.includes(location.host)) || /ResizeObserver|Script error|extension/i.test(msg)) return; if (Date.now() - lastErrT < 8000) return; lastErrT = Date.now(); toast(friendly(e && (e.reason || e.error || e.message) || e), true); };
+window.addEventListener('error', softErr); window.addEventListener('unhandledrejection', softErr);
+window.addEventListener('offline', () => toast('انقطع النت. اللي تكتبه الحين ما راح ينحفظ لين يرجع الاتصال.', true));
+window.addEventListener('online', () => toast('رجع النت.'));
 start();
 })();
