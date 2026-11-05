@@ -282,7 +282,7 @@ function contactRow(c, i) {
 }
 function openInfl(id) {
   const i = infl(id); if (!i) return;
-  const me = S.me.id, owner = i.nominated_by === me || isAdmin(), appr = isApprover();
+  const me = S.me.id, owner = i.nominated_by === me || isAdmin(), appr = isApprover() && (i.nominated_by !== me || isAdmin());
   const st = i.acq_status, editable1 = owner && ['draft', 'needs_edit'].includes(st) || isAdmin();
   const open2 = st === 'approved' || st === 'none';
   const keys = platKeys(i); const D = S.deals.filter(d => d.influencer_id === i.id);
@@ -495,7 +495,7 @@ function openCampNom(cid, preInfl) {
   });
 }
 async function requestQuota(cid) {
-  const c = camp(cid); const ap = withRole('approver').filter(m => !m.is_admin || (m.roles || []).includes('approver'))[0];
+  const c = camp(cid); const ap = isApprover() && !isAdmin() ? S.members.find(m => m.is_admin && m.active) : withRole('approver').filter(m => !m.is_admin || (m.roles || []).includes('approver'))[0];
   const qty = await dialog(`<h3>طلب ترشيحات إضافية — ${esc(c.name)}</h3><div class="field"><label for="rq_n">كم ترشيح زيادة؟</label><input type="number" min="1" id="rq_n" value="2"></div><div class="field"><label for="rq_w">السبب</label><textarea id="rq_w"></textarea></div>`, box => { const n = Number(box.querySelector('#rq_n').value); if (!n || n < 1) { toast('اكتب العدد', true); return false; } return { n, w: box.querySelector('#rq_w').value.trim() }; });
   if (!qty) return;
   const r = await saveReq(null, { kind: 'quota', campaign_id: cid, qty: qty.n, title: `زيادة ${qty.n} ترشيح في حملة ${c.name}`, details: qty.w, to_member: ap ? ap.id : null, from_member: S.me.id });
@@ -533,7 +533,7 @@ function renderCamps() {
        <div class="field"><label>العدد المطلوب</label><input type="number" min="0" data-k="target_total" value="${c.target_total ?? ''}"></div>
        <div class="field"><label>الحالة</label><select data-k="status">${Object.entries(CAMP_ST).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
       </div><button class="btn sm primary" data-csave type="button">حفظ</button></details>` : ''}
-     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر متعب</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id)}</td><td class="num">${s.sent.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
+     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر متعب</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.sent.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
      ${ap ? `<div class="row"><button class="btn sm primary" data-qsave type="button">حفظ الحصص</button><button class="btn sm" data-qeven type="button">وزّع المطلوب بالتساوي</button><span class="muted small">مجموع الحصص ${quotaSum}${target ? ' من ' + target : ''}</span></div>` : ''}
     </div>`;
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
@@ -566,14 +566,15 @@ const BULK = {
 function queuesFor(id) {
   const G = {}; const add = (k, x) => (G[k] = G[k] || []).push(x);
   const isAp = id !== 'admin' && strictRole(id, 'approver');
+  const apOwn = mid => strictRole(mid, 'approver');   // شغل المعتمد نفسه يعتمده الأدمن (فصل المهام)
   for (const i of S.infl) {
-    if (id === 'admin') continue;
-    if (i.acq_status === 'pending' && isAp) add('acq_review', { i });
+    if (id === 'admin') { if (i.acq_status === 'pending' && apOwn(i.nominated_by)) add('acq_review', { i }); continue; }
+    if (i.acq_status === 'pending' && isAp && i.nominated_by !== id) add('acq_review', { i });
     if (i.nominated_by === id) { if (i.acq_status === 'needs_edit') add('acq_fix', { i }); if (i.acq_status === 'draft') add('acq_draft', { i }); if (i.acq_status === 'approved' && !i.agreed_at) add('acq_contact', { i }); }
   }
   for (const d of S.deals) {
     if (d.closed_at) continue;
-    if (id === 'admin') { if (allDelivered(d) && !d.paid_at && !d.no_pay && d.approval === 'approved') add('pay', { d, i: SI.video }); continue; }
+    if (id === 'admin') { if (allDelivered(d) && !d.paid_at && !d.no_pay && d.approval === 'approved') add('pay', { d, i: SI.video }); if (apOwn(d.member_id) && d.sent_at && !isParked(d)) { const j = curStep(d); if (j >= 0 && j < STEPS.length && STEPS[j].k === 'appr') add('appr', { d, i: j }); else if (j >= 0 && j < STEPS.length && STEPS[j].k === 'video' && draftPending(d)) add('draft', { d, i: j }); } continue; }
     if (d.approval === 'rejected') continue;
     if (d.member_id === id && d.approval === 'needs_edit') { add('camp_fix', { d, i: 0 }); continue; }
     if (d.member_id === id && !d.sent_at && d.approval === 'pending') { add('camp_draft', { d, i: 0 }); continue; }
@@ -583,17 +584,17 @@ function queuesFor(id) {
     if (d.approval === 'approved') for (const p of platKeys(d)) if (delivered(d, p) && !launched(d, p)) { if (strictRole(id, 'media')) add('launch', { d, i: SI.live, p }); if (strictRole(id, 'snap')) add('snap_follow', { d, i: SI.live, p }); }
     if (i < 0 || i >= STEPS.length) continue;
     const k = STEPS[i].k;
-    if (k === 'appr') { if (isAp) add('appr', { d, i }); continue; }
+    if (k === 'appr') { if (isAp && d.member_id !== id) add('appr', { d, i }); continue; }
     if (k === 'ship') { if (strictRole(id, 'shipper')) add(d.ship_failed_at ? 'ship_fail' : d.shipped_at ? 'ship_wait' : 'ship_send', { d, i }); continue; }
     if (k === 'live') continue;
-    if (k === 'video') { if (draftPending(d)) { if (isAp) add('draft', { d, i }); } else if (d.member_id === id) add(d.video_ok_at || platKeys(d).some(p => delivered(d, p)) ? 'post' : (d.rounds > 0 ? 'video_fix' : 'video'), { d, i }); continue; }
+    if (k === 'video') { if (draftPending(d)) { if (isAp && d.member_id !== id) add('draft', { d, i }); } else if (d.member_id === id) add(d.video_ok_at || platKeys(d).some(p => delivered(d, p)) ? 'post' : (d.rounds > 0 ? 'video_fix' : 'video'), { d, i }); continue; }
     if (d.member_id === id) add(k, { d, i });
   }
   if (id !== 'admin' && strictRole(id, 'creator')) for (const c of S.camps.filter(c => c.status === 'active')) { const qn = quotaOf(c.id, id); const s = campStats(c.id, id); if (qn > s.used) add('camp_quota', { c, left: qn - s.used }); }
   for (const r of S.reqs) {
     if (id === S.me.id && unread(r)) add('req_new', { r });
     if (r.status === 'done' || r.status === 'cancelled') continue;
-    if (r.kind === 'quota') { if (r.to_member === id || (isAp && !r.to_member)) add('quota_req', { r }); continue; }
+    if (r.kind === 'quota') { if ((r.to_member === id && r.from_member !== id) || (id === 'admin' && apOwn(r.from_member)) || (isAp && !r.to_member && r.from_member !== id)) add('quota_req', { r }); continue; }
     if (r.to_member === id && (r.status === 'new' || r.status === 'doing')) add('req_in', { r });
     if (r.to_member === id && r.status === 'fix') add('req_fix', { r });
     if (r.from_member === id && r.status === 'review') add('req_review', { r });
@@ -665,7 +666,7 @@ $('mineBody').addEventListener('click', async e => {
 function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${i === SI.video && draftPending(d) ? ' (عند متعب)' : ''}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
 function openDeal(id) {
   const d = S.deals.find(x => x.id === id); if (!d) return;
-  const i = curStep(d), me = S.me.id, adm = isAdmin(), appr = isApprover(), mine = d.member_id === me || adm;
+  const i = curStep(d), me = S.me.id, adm = isAdmin(), appr = isApprover() && (d.member_id !== me || adm), mine = d.member_id === me || adm;
   const ship = hasRole(me, 'shipper'), media = hasRole(me, 'media') || hasRole(me, 'snap');
   const keys = platKeys(d); const I = infl(d.influencer_id);
   const stepper = `<div class="stepper">${STEPS.map((s, j) => `<div class="st ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}"><b></b><span>${s.n}</span></div>`).join('')}</div>`;
@@ -864,7 +865,7 @@ if ($('notifBtn')) $('notifBtn').onclick = async () => { try { await Notificatio
 async function openReq(id) {
   const r = S.reqs.find(x => x.id === id); if (!r) return; const me = S.me.id, isTo = r.to_member === me || isAdmin(), isFrom = r.from_member === me || isAdmin();
   const { data: E0, error: eE } = await sb.from('request_events').select('*').eq('request_id', id).order('created_at'); const E = E0 || []; if (eE) S.noEv = true;
-  const quota = r.kind === 'quota', canQ = quota && isApprover() && !['done', 'cancelled'].includes(r.status), open = !['done', 'cancelled'].includes(r.status);
+  const quota = r.kind === 'quota', canQ = quota && isApprover() && (r.from_member !== S.me.id || isAdmin()) && !['done', 'cancelled'].includes(r.status), open = !['done', 'cancelled'].includes(r.status);
   let dn = 0; const evHtml = E.map(e => { const lbl = e.type === 'deliver' ? (++dn === 1 ? 'سلّم' : `سلّم التعديل ${dn - 1}`) : EV[e.type] || e.type;
     return `<div class="ev ${EV_CLS[e.type] || ''}"><div class="h"><b>${esc(memName(e.member_id))}</b> <span class="pill ${EV_CLS[e.type] || ''}">${esc(lbl)}</span><span class="muted small">${dtFull(e.created_at)}</span></div>${e.body ? `<div class="b">${linkify(e.body)}</div>` : ''}</div>`; }).join('');
   const steps = ['انطلب', 'قيد التنفيذ', 'بانتظار المراجعة', 'معتمد'], si = { new: 0, doing: 1, fix: 1, review: 2, done: 3, cancelled: -1 }[r.status];
