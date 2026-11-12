@@ -91,6 +91,11 @@ const infl = id => S.infl.find(x => x.id === id);
 const creators = () => active().filter(m => (m.roles || []).includes('creator'));
 const strictRole = (id, r) => ((mem(id) || {}).roles || []).includes(r);
 const quotaOf = (cid, mid) => (S.quotas.find(q => q.campaign_id === cid && q.member_id === mid) || {}).quota || 0;
+/* من يعتمد شغل هذا الشخص؟ فصل المهام: شغل المعتمد نفسه يعتمده الأدمن */
+const adminName = () => (S.members.find(m => m.is_admin && m.active) || {}).name || 'عبدالمحسن';
+const apprNames = () => withRole('approver').filter(m => !m.is_admin).map(m => m.name).join('، ') || 'متعب';
+const apprFor = mid => strictRole(mid, 'approver') ? adminName() : apprNames();
+const stepWho = s => s.who === 'creator' ? 'صانع المحتوى' : s.who === 'approver' ? apprNames() : withRole(s.who).filter(m => !m.is_admin).map(m => m.name).join('، ') || ROLES[s.who];
 
 /* ================= المنصات ================= */
 function platKeys(x) { const p = (x && (x.platform ?? x.platforms)) || ''; if (/جميع/.test(p)) return ['tt', 'sn', 'ig']; const a = []; if (/تيك/.test(p)) a.push('tt'); if (/سناب/.test(p)) a.push('sn'); if (/انست/.test(p)) a.push('ig'); return a; }
@@ -237,8 +242,8 @@ const reasonBox = (title, required) => dialog(`<h3>${esc(title)}</h3><div class=
 
 /* ================= زر + ترشيح ================= */
 $('newDeal').onclick = () => modal(`<h2>ترشيح جديد</h2><div class="chooser">
-  <button type="button" id="chAcq"><b>استقطاب جديد</b><span class="muted small">حساب جديد تبي نتعامل معه. تسجّل بياناته، يعتمده متعب، وبعدها تتواصل وتفاوض.</span></button>
-  <button type="button" id="chCamp"><b>ترشيح للحملة</b><span class="muted small">ترشّح حساباتك المطلوبة لحملة معيّنة دفعة وحدة، وترسلها لمتعب.</span></button></div>
+  <button type="button" id="chAcq"><b>استقطاب جديد</b><span class="muted small">حساب جديد تبي نتعامل معه. تسجّل بياناته، يعتمده ${esc(apprFor(S.me.id))}، وبعدها تتواصل وتفاوض.</span></button>
+  <button type="button" id="chCamp"><b>ترشيح للحملة</b><span class="muted small">ترشّح حساباتك المطلوبة لحملة معيّنة دفعة وحدة، وترسلها للاعتماد (${esc(apprFor(S.me.id))}).</span></button></div>
   <button class="btn" id="chX" type="button">إلغاء</button>`, () => { $('chAcq').onclick = () => openAcqNew(); $('chCamp').onclick = () => openCampNom(); $('chX').onclick = closeModal; }, true);
 $('acqNew').onclick = () => openAcqNew();
 
@@ -253,7 +258,7 @@ async function takenBy(handle, phone) {
   if (seesAll() || (!handle && !phone)) return null;
   try { const { data, error } = await sb.rpc('infl_lookup', { p_handle: handle || '', p_phone: phone || '' }); if (error || !data || data.mine) return null; return data; } catch (e) { return null; }
 }
-const takenMsg = t => `الحساب «${t.name}» مسجّل عند ${t.owner_name || 'زميل'}. ما ينسجّل مرتين، وإذا تحتاجه راجع متعب.`;
+const takenMsg = t => `الحساب «${t.name}» مسجّل عند ${t.owner_name || 'زميل'}. ما ينسجّل مرتين، وإذا تحتاجه راجع ${apprFor(S.me.id)}.`;
 function inflHistory(i) {
   if (!i) return '';
   const D = S.deals.filter(d => d.influencer_id === i.id); const posted = D.filter(allDelivered);
@@ -262,7 +267,7 @@ function inflHistory(i) {
 document.addEventListener('click', e => { const b = e.target.closest('[data-openinfl]'); if (b) openInfl(b.dataset.openinfl); });
 function openAcqNew() {
   const canDate = isAdmin() || isApprover();
-  modal(`<h2>استقطاب جديد</h2><div class="muted small">المرحلة الأولى: بيانات الحساب. بعد ما يعتمده متعب تنفتح لك مرحلة التواصل والتفاوض في نفس الملف.</div>
+  modal(`<h2>استقطاب جديد</h2><div class="muted small">المرحلة الأولى: بيانات الحساب. بعد ما يعتمده ${esc(apprFor(S.me.id))} تنفتح لك مرحلة التواصل والتفاوض في نفس الملف.</div>
   <div class="grid2">
    <div class="field"><label for="q_date">تاريخ الترشيح</label><input type="date" id="q_date" value="${today()}" ${canDate ? '' : 'disabled'}></div>
    <div class="field"><label>المرشِّح</label><input type="text" value="${esc(S.me.name)}" disabled></div>
@@ -286,7 +291,7 @@ function openAcqNew() {
       root.querySelectorAll('button').forEach(b => b.disabled = true);
       const r = await saveInfl(null, { name, tiktok_url: url, handle, acc_type: type, account_status: $('q_status').value, nominated_on: $('q_date').value || today(), nominated_by: S.me.id, source: 'acq', acq_status: send ? 'pending' : 'draft', acq_sent_at: send ? nowIso() : null });
       root.querySelectorAll('button').forEach(b => b.disabled = false);
-      if (r) { toast(send ? 'انرسل لمتعب للمراجعة' : 'انحفظ كمسودة'); openInfl(r.id); }
+      if (r) { toast(send ? 'انرسل للمراجعة عند ' + apprFor(S.me.id) : 'انحفظ كمسودة'); openInfl(r.id); }
     };
     $('q_send').onclick = () => save(true); $('q_draft').onclick = () => save(false);
   });
@@ -326,9 +331,9 @@ function openInfl(id) {
    ${editable1 && st !== 'approved' && st !== 'none' ? `<div class="row"><button class="btn primary" data-a="send" type="button">${st === 'needs_edit' ? 'أعد الإرسال للمراجعة' : 'إرسال الترشيح للمراجعة'}</button><button class="btn" data-a="save1" type="button">حفظ</button></div>` : editable1 ? '<div class="row"><button class="btn" data-a="save1" type="button">حفظ</button></div>' : ''}
   </div></details>
 
-  ${st !== 'none' ? `<details class="sec ${st === 'approved' ? 'd' : st === 'pending' ? 'c' : ''}" ${st === 'pending' ? 'open' : ''}><summary><span class="idx">2</span><span class="ttl">اعتماد متعب</span><span class="meta">${i.acq_decided_at ? dShort(i.acq_decided_at) + ' · ' + esc(memName(i.acq_decided_by)) : ''}</span></summary><div class="body">
+  ${st !== 'none' ? `<details class="sec ${st === 'approved' ? 'd' : st === 'pending' ? 'c' : ''}" ${st === 'pending' ? 'open' : ''}><summary><span class="idx">2</span><span class="ttl">الاعتماد (${esc(apprFor(i.nominated_by))})</span><span class="meta">${i.acq_decided_at ? dShort(i.acq_decided_at) + ' · ' + esc(memName(i.acq_decided_by)) : ''}</span></summary><div class="body">
    ${appr && st === 'pending' ? `<div class="row"><button class="btn good" data-a="approve" type="button">اعتماد</button><button class="btn" data-a="needs_edit" type="button">يحتاج تعديل</button><button class="btn danger" data-a="reject" type="button">رفض</button></div>`
-     : st === 'pending' ? `<div class="muted">بانتظار ${esc(withRole('approver').map(m => m.name).join('، ') || 'متعب')}.</div>` : st === 'draft' ? '<div class="muted">ما انرسل للمراجعة للحين.</div>' : `<div class="muted">${esc(ACQ[st][0])}</div>`}
+     : st === 'pending' ? `<div class="muted">بانتظار ${esc(apprFor(i.nominated_by))}.</div>` : st === 'draft' ? '<div class="muted">ما انرسل للمراجعة للحين.</div>' : `<div class="muted">${esc(ACQ[st][0])}</div>`}
   </div></details>` : ''}
 
   <details class="sec ${open2 ? (i.agreed_at ? 'd' : 'c') : ''}" ${open2 && !i.agreed_at ? 'open' : ''}><summary><span class="idx">3</span><span class="ttl">التواصل والتفاوض</span><span class="meta">${i.agreed_at ? 'تم الاتفاق ' + dShort(i.agreed_at) : contacts.length ? contacts.length + ' محاولة' : ''}</span></summary><div class="body">
@@ -470,11 +475,11 @@ function openCampNom(cid, preInfl) {
   fixes.forEach(d => cards.push(nomCard(++n, d))); drafts.forEach(d => cards.push(nomCard(++n, d)));
   for (let k = 0; k < free; k++) cards.push(nomCard(++n, null, k === 0 ? preInfl : null));
   modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${quota} · أرسلت ${sentN} · ${fixes.length ? fixes.length + ' ترجع للتعديل · ' : ''}الباقي ${Math.max(0, quota - sentN)}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
-   ${!quota ? '<div class="dup">ما عندك حصة في هذي الحملة. اطلب من متعب يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية».</div>' : ''}
-   ${!cards.length && quota ? '<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من متعب.</div>' : ''}
+   ${!quota ? `<div class="dup">ما عندك حصة في هذي الحملة. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية».</div>` : ''}
+   ${!cards.length && quota ? `<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من ${esc(apprFor(S.me.id))}.</div>` : ''}
    <div id="cn_cards" style="display:grid;gap:12px">${cards.join('')}</div>
    <div class="panel" style="position:sticky;bottom:0"><div class="row between"><b id="cn_count"></b>
-    <div class="row"><button class="btn" id="cn_more" type="button">طلب ترشيحات إضافية</button>${cards.length ? '<button class="btn" id="cn_draft" type="button">حفظ كمسودة</button><button class="btn primary" id="cn_send" type="button">إرسال الترشيحات إلى متعب</button>' : ''}</div></div></div>`, root => {
+    <div class="row"><button class="btn" id="cn_more" type="button">طلب ترشيحات إضافية</button>${cards.length ? '<button class="btn" id="cn_draft" type="button">حفظ كمسودة</button><button class="btn primary" id="cn_send" type="button">إرسال الترشيحات للاعتماد</button>' : ''}</div></div></div>`, root => {
     $('cn_x').onclick = closeModal;
     const cardEls = () => [...root.querySelectorAll('[data-card]')];
     const f = (el, k) => { const x = el.querySelector(`[data-f="${k}"]`); return x ? x.value.trim() : ''; };
@@ -511,7 +516,7 @@ function openCampNom(cid, preInfl) {
       busy = false; root.querySelectorAll('#cn_draft,#cn_send').forEach(b => b.disabled = false);
       if (taken.length) toast(taken.join(' '), true);
       else if (bad) toast(`${bad} ترشيح فيه خطأ في الرابط أو الجوال، صححه وأعد المحاولة`, true);
-      else toast(send ? `انرسل ${sent} ترشيح لمتعب${saved > sent ? '، و' + (saved - sent) + ' انحفظت مسودة لأنها ناقصة' : ''}` : `انحفظ ${saved} كمسودة`);
+      else toast(send ? `انرسل ${sent} ترشيح للاعتماد عند ${apprFor(S.me.id)}${saved > sent ? '، و' + (saved - sent) + ' انحفظت مسودة لأنها ناقصة' : ''}` : `انحفظ ${saved} كمسودة`);
       if (!bad && !taken.length) { if (send && sent) closeModal(); else openCampNom(cid); }
     };
     if ($('cn_draft')) { $('cn_draft').onclick = () => saveAll(false); $('cn_send').onclick = () => saveAll(true); }
@@ -522,7 +527,7 @@ async function requestQuota(cid) {
   const qty = await dialog(`<h3>طلب ترشيحات إضافية — ${esc(c.name)}</h3><div class="field"><label for="rq_n">كم ترشيح زيادة؟</label><input type="number" min="1" id="rq_n" value="2"></div><div class="field"><label for="rq_w">السبب</label><textarea id="rq_w"></textarea></div>`, box => { const n = Number(box.querySelector('#rq_n').value); if (!n || n < 1) { toast('اكتب العدد', true); return false; } return { n, w: box.querySelector('#rq_w').value.trim() }; });
   if (!qty) return;
   const r = await saveReq(null, { kind: 'quota', campaign_id: cid, qty: qty.n, title: `زيادة ${qty.n} ترشيح في حملة ${c.name}`, details: qty.w, to_member: ap ? ap.id : null, from_member: S.me.id });
-  if (r) toast('انرسل الطلب لمتعب');
+  if (r) toast('انرسل الطلب لـ' + (ap ? ap.name : apprNames()));
 }
 
 /* ================= صفحة الحملات ================= */
@@ -542,7 +547,7 @@ function renderCamps() {
      <div class="tiles">
       <div class="tile"><span class="l">المطلوب</span><span class="v">${target || '—'}</span></div>
       <div class="tile"><span class="l">موزّع على الموظفين</span><span class="v">${quotaSum}</span></div>
-      <div class="tile"><span class="l">انرسل لمتعب</span><span class="v">${st.sent.length}</span></div>
+      <div class="tile"><span class="l">انرسل للاعتماد</span><span class="v">${st.sent.length}</span></div>
       <div class="tile"><span class="l">معتمد</span><span class="v">${st.approved.length}</span></div>
       <div class="tile"><span class="l">قيد الشحن</span><span class="v">${shipping}</span></div>
       <div class="tile"><span class="l">استلموا</span><span class="v">${deliv}</span></div>
@@ -557,13 +562,13 @@ function renderCamps() {
        <div class="field"><label>العدد المطلوب</label><input type="number" min="0" data-k="target_total" value="${c.target_total ?? ''}"></div>
        <div class="field"><label>الحالة</label><select data-k="status">${Object.entries(CAMP_ST).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
       </div><button class="btn sm primary" data-csave type="button">حفظ</button></details>` : ''}
-     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر متعب</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.sent.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
+     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر الاعتماد</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.sent.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
      ${ap ? `<div class="row"><button class="btn sm primary" data-qsave type="button">حفظ الحصص</button><button class="btn sm" data-qeven type="button">وزّع المطلوب بالتساوي</button><span class="muted small">مجموع الحصص ${quotaSum}${target ? ' من ' + target : ''}</span></div>` : ''}
     </div>`;
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
 }
 $('cEnded').addEventListener('input', renderCamps);
-$('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. متعب يوزّع الحصص'); renderCamps(); } };
+$('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
 $('cList').addEventListener('click', async e => {
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
   const box = e.target.closest('[data-camp]'); if (!box) return; const cid = box.dataset.camp;
@@ -668,7 +673,7 @@ $('mineAs').addEventListener('change', renderMine);
 async function launchPlat(d, p) { const ch = { [p + '_live_at']: nowIso() }; const after = { ...d, ...ch }; if (allLaunched(after)) Object.assign(ch, { live_at: nowIso(), ad_name: d.ad_name || adName(d) }); return saveDeal(d.id, ch); }
 async function decideDeal(d, kind) {
   const r = await reasonBox(kind === 'reject' ? 'سبب الرفض' : 'وش المطلوب يتعدّل؟', kind === 'needs_edit'); if (r == null) return null;
-  return saveDeal(d.id, kind === 'reject' ? { approval: 'rejected', decision_reason: r.trim(), approved_by: S.me.id, approved_at: null, closed_reason: 'رفضه متعب' } : { approval: 'needs_edit', decision_reason: r.trim(), approved_by: S.me.id, sent_at: null });
+  return saveDeal(d.id, kind === 'reject' ? { approval: 'rejected', decision_reason: r.trim(), approved_by: S.me.id, approved_at: null, closed_reason: 'رفضه ' + memName(S.me.id) } : { approval: 'needs_edit', decision_reason: r.trim(), approved_by: S.me.id, sent_at: null });
 }
 $('mineBody').addEventListener('click', async e => {
   const o = e.target.closest('[data-open]'); if (o) return openDeal(o.dataset.open);
@@ -699,14 +704,15 @@ function shipSheet() {
 $('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); });
 
 /* ================= ملف المشاركة في الحملة ================= */
-function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${i === SI.video && draftPending(d) ? ' (عند متعب)' : ''}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
+function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${i === SI.video && draftPending(d) ? ` (عند ${esc(apprFor(d.member_id))})` : ''}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
 function openDeal(id) {
   const d = S.deals.find(x => x.id === id); if (!d) return;
   const i = curStep(d), me = S.me.id, adm = isAdmin(), appr = isApprover() && (d.member_id !== me || adm), mine = d.member_id === me || adm;
   const ship = hasRole(me, 'shipper'), media = hasRole(me, 'media') || hasRole(me, 'snap');
   const keys = platKeys(d); const I = infl(d.influencer_id);
   const stepper = `<div class="stepper">${STEPS.map((s, j) => `<div class="st ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}"><b></b><span>${s.n}</span></div>`).join('')}</div>`;
-  const sec = (j, body, meta) => `<details class="sec ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}" ${j === i ? 'open' : ''}><summary><span class="idx">${j + 1}</span><span class="ttl">${STEPS[j].n}</span><span class="meta">${meta || ''}</span></summary><div class="body">${body}</div></details>`;
+  const secWho = j => STEPS[j].k === 'appr' ? apprFor(d.member_id) : STEPS[j].k === 'video' ? 'صانع المحتوى + ' + apprFor(d.member_id) : stepWho(STEPS[j]);
+  const sec = (j, body, meta) => `<details class="sec ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}" ${j === i ? 'open' : ''}><summary><span class="idx">${j + 1}</span><span class="ttl">${STEPS[j].n} <span class="muted small">· ${esc(secWho(j))}</span></span><span class="meta">${meta || ''}</span></summary><div class="body">${body}</div></details>`;
   const v = k => esc(d[k] ?? '');
   const link = intakeLink(d);
   const waIntake = waLink(d.phone || d.rcv_phone, `هلا ${d.name}، نورتنا 🌹 عبّ بياناتك للشحن والتحويل من هذا الرابط: ${link}`);
@@ -729,8 +735,8 @@ function openDeal(id) {
      <div class="field"><label for="f_hook">هوك الفيديو</label><input type="text" id="f_hook" value="${v('hook')}"></div>
    </div>${platChecks('d', keys)}
    <div class="field"><label for="f_notes">ملاحظات</label><textarea id="f_notes">${v('notes')}</textarea></div>
-   ${mine ? `<div class="row"><button class="btn" data-act="save0" type="button">حفظ</button>${(!d.sent_at && d.approval === 'pending') || d.approval === 'needs_edit' ? `<button class="btn primary" data-act="send" type="button">${d.approval === 'needs_edit' ? 'أعد الإرسال لمتعب' : 'أرسل لمتعب'}</button>` : ''}</div>` : ''}`, d.sent_at ? 'أُرسل ' + dShort(d.sent_at) : 'مسودة')}
-  ${sec(1, appr && (d.approval === 'pending' && d.sent_at || d.approval === 'backup') ? `<div class="row"><button class="btn good" data-act="approve" type="button">اعتماد</button><button class="btn" data-act="needs_edit" type="button">يحتاج تعديل</button><button class="btn" data-act="backup" type="button">احتياط</button><button class="btn danger" data-act="reject" type="button">رفض</button></div>` : `<div class="muted">${d.approval === 'approved' ? 'معتمد من ' + esc(memName(d.approved_by)) : d.approval === 'pending' ? 'بانتظار ' + esc(withRole('approver').map(m => m.name).join('، ') || 'متعب') : esc(d.approval)}</div>`, d.approval === 'approved' ? 'معتمد ' + dShort(d.approved_at) : '')}
+   ${mine ? `<div class="row"><button class="btn" data-act="save0" type="button">حفظ</button>${(!d.sent_at && d.approval === 'pending') || d.approval === 'needs_edit' ? `<button class="btn primary" data-act="send" type="button">${d.approval === 'needs_edit' ? 'أعد الإرسال للاعتماد' : 'أرسل للاعتماد'} (${esc(apprFor(d.member_id))})</button>` : ''}</div>` : ''}`, d.sent_at ? 'أُرسل ' + dShort(d.sent_at) : 'مسودة')}
+  ${sec(1, appr && (d.approval === 'pending' && d.sent_at || d.approval === 'backup') ? `<div class="row"><button class="btn good" data-act="approve" type="button">اعتماد</button><button class="btn" data-act="needs_edit" type="button">يحتاج تعديل</button><button class="btn" data-act="backup" type="button">احتياط</button><button class="btn danger" data-act="reject" type="button">رفض</button></div>` : `<div class="muted">${d.approval === 'approved' ? 'معتمد من ' + esc(memName(d.approved_by)) : d.approval === 'pending' ? 'بانتظار ' + esc(apprFor(d.member_id)) : esc(d.approval)}</div>`, d.approval === 'approved' ? 'معتمد ' + dShort(d.approved_at) : '')}
   ${sec(2, `<div class="muted small">طريقتين: تكتب العنوان بنفسك، أو ترسل الرابط للمؤثر يعبّيه هو ومعه حسابه البنكي.</div>
    <div class="grid2" ${mine || ship ? '' : 'inert'}>
     <div class="field"><label for="f_rcv_name">اسم المستلم</label><input type="text" id="f_rcv_name" value="${v('rcv_name')}"></div>
@@ -745,7 +751,7 @@ function openDeal(id) {
    ${d.intake_at ? `<div class="small">عبّاها المؤثر بنفسه ${dShort(d.intake_at)}</div>` : ''}${adm ? '<div id="bankBox"></div>' : ''}`, hasAddress(d) ? 'العنوان جاهز' : d.intake_at ? 'عبّاها المؤثر' : '')}
   ${sec(3, `<div class="grid3"><div class="field"><label for="f_ship_company">شركة الشحن</label><input type="text" id="f_ship_company" list="dlShip" value="${v('ship_company')}" placeholder="اختر أو اكتب"><datalist id="dlShip">${SHIP_COS.map(x => `<option>${x}</option>`).join('')}</datalist></div><div class="field"><label for="f_tracking">رقم البوليصة</label><input type="text" id="f_tracking" dir="ltr" value="${v('tracking')}"></div><div class="field"><label for="f_ship_note">ملاحظة الشحن</label><input type="text" id="f_ship_note" value="${v('ship_note')}"></div></div>
    ${ship || adm ? `<div class="row"><button class="btn" data-act="shipped" type="button">${d.shipped_at ? 'انشحن ' + dShort(d.shipped_at) : 'انشحن اليوم'}</button><button class="btn good" data-act="delivered" type="button">${d.delivered_at ? 'وصل ' + dShort(d.delivered_at) : 'وصل اليوم'}</button><button class="btn danger" data-act="failed" type="button">${d.ship_failed_at ? 'تعذّر ' + dShort(d.ship_failed_at) : 'تعذّر التسليم'}</button></div>` : `<div class="muted small">${d.delivered_at ? 'وصل ' + dShort(d.delivered_at) : d.shipped_at ? 'انشحن ' + dShort(d.shipped_at) : 'عند صقر'}</div>`}`, d.delivered_at ? 'وصل ' + dShort(d.delivered_at) : d.ship_failed_at ? 'تعذّر' : d.shipped_at ? 'في الطريق' : '')}
-  ${sec(4, `<div class="card ${d.video_ok_at ? 'ok' : draftPending(d) ? 'part' : ''}"><div class="hd"><b>أولاً: مراجعة المقطع الخام</b>${d.video_ok_at ? `<span class="pill good">معتمد ${dShort(d.video_ok_at)}</span>` : draftPending(d) ? `<span class="pill acc">عند ${esc(withRole('approver').map(m => m.name).join('، ') || 'متعب')} للمراجعة من ${dShort(d.draft_at)}</span>` : '<span class="pill">ما انرسل للمراجعة</span>'}${d.rounds ? `<span class="pill warn">${d.rounds} جولة تعديل</span>` : ''}</div>
+  ${sec(4, `<div class="card ${d.video_ok_at ? 'ok' : draftPending(d) ? 'part' : ''}"><div class="hd"><b>أولاً: مراجعة المقطع الخام</b>${d.video_ok_at ? `<span class="pill good">معتمد ${dShort(d.video_ok_at)}</span>` : draftPending(d) ? `<span class="pill acc">عند ${esc(apprFor(d.member_id))} للمراجعة من ${dShort(d.draft_at)}</span>` : '<span class="pill">ما انرسل للمراجعة</span>'}${d.rounds ? `<span class="pill warn">${d.rounds} جولة تعديل</span>` : ''}</div>
      ${!d.video_ok_at && !draftPending(d) && d.rounds && (d.draft_feedback || '').trim() ? `<div class="dup"><b>المطلوب تعديله في المقطع:</b> ${esc(d.draft_feedback)}</div>` : ''}
      <div ${mine && !d.video_ok_at && !draftPending(d) ? '' : 'inert'} style="display:grid;gap:12px">
       <div class="field"><label for="f_draft_url">رابط المقطع الخام (قوقل درايف أو أي رابط يفتح) *</label><input type="url" id="f_draft_url" dir="ltr" value="${v('draft_url')}" placeholder="https://drive.google.com/..."></div>
@@ -818,8 +824,8 @@ function fillSel(id, list, all) { const s = $(id), v = s.value; s.innerHTML = `<
 const inPipe = d => d.sent_at || d.approval !== 'pending';
 function renderPipe() {
   const open = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval !== 'needs_edit');
-  $('board').innerHTML = STEPS.map((s, i) => { const L = open.filter(d => curStep(d) === i), late = L.filter(d => lateness(d, i) === 'late').length; return `<button class="col${S.pStep === s.k ? ' on' : ''}" data-col="${s.k}" type="button"><span class="k">${i + 1}</span><span class="nm">${s.n}</span><span class="n">${L.length}</span><span class="small" style="color:var(--bad)">${late ? late + ' متأخر' : '&nbsp;'}</span></button>`; }).join('')
-    + `<button class="col${S.pStep === 'done' ? ' on' : ''}" data-col="done" type="button"><span class="k">✓</span><span class="nm">اكتمل</span><span class="n">${open.filter(d => curStep(d) === STEPS.length).length}</span><span class="small">&nbsp;</span></button>`;
+  $('board').innerHTML = STEPS.map((s, i) => { const L = open.filter(d => curStep(d) === i), late = L.filter(d => lateness(d, i) === 'late').length; return `<button class="col${S.pStep === s.k ? ' on' : ''}" data-col="${s.k}" type="button"><span class="k">${i + 1}</span><span class="nm">${s.n}</span><span class="small muted">${esc(stepWho(s))}</span><span class="n">${L.length}</span><span class="small" style="color:var(--bad)">${late ? late + ' متأخر' : '&nbsp;'}</span></button>`; }).join('')
+    + `<button class="col${S.pStep === 'done' ? ' on' : ''}" data-col="done" type="button"><span class="k">✓</span><span class="nm">اكتمل</span><span class="small muted">&nbsp;</span><span class="n">${open.filter(d => curStep(d) === STEPS.length).length}</span><span class="small">&nbsp;</span></button>`;
   fillSel('pMem', creators().map(m => [m.id, m.name]), 'الكل');
   fillSel('pCamp', S.camps.map(c => [c.id, c.name]), 'الكل');
   const qq = $('pQ').value.trim().toLowerCase(), pm = $('pMem').value, pc = $('pCamp').value, late = $('pLate').checked, cl = $('pClosed').checked;
@@ -1059,7 +1065,7 @@ async function renderDaily(a, b) {
 }
 $('dXlsx').onclick = async () => {
   const dt = t => !t ? '' : String(t).length <= 10 ? String(t) : dtX(t);
-  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال لمتعب': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'الدفع': dt(d.paid_at) }));
+  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'الدفع': dt(d.paid_at) }));
   const infls = S.infl.map(i => ({ 'المعلن': i.name, 'بالإنجليزي': i.name_en, 'اليوزر': i.handle, 'رابط تيك توك': i.tiktok_url, 'نوع الحساب': i.acc_type, 'حالة الحساب': i.account_status, 'المرشِّح': memName(i.nominated_by), 'تاريخ الترشيح': i.nominated_on, 'المصدر': i.source === 'acq' ? 'استقطاب' : i.source === 'campaign' ? 'حملة' : 'مستورد', 'حالة الاستقطاب': (ACQ[i.acq_status] || [i.acq_status])[0], 'سبب القرار': i.acq_reason, 'محاولات التواصل': (i.contacts || []).length, 'آخر نتيجة': ((i.contacts || []).slice(-1)[0] || {}).result || '', 'واجه مشكلة': i.had_problem == null ? '' : i.had_problem ? 'نعم' : 'لا', 'المشكلة': i.problem, 'المنصات': i.platforms, 'سناب': i.snap_user, 'انستقرام': i.ig_user, 'الجوال': i.phone, 'الدولة': i.country, 'المدينة': i.city, 'الحي والرمز': i.district, 'قبل التفاوض': i.price_before, 'بعد التفاوض': i.price_after, 'العملة': i.currency, 'تم الاتفاق': dt(i.agreed_at) }));
   const reqs = S.reqs.map(r => ({ 'النوع': REQ_KINDS[r.kind], 'العنوان': r.title, 'من': memName(r.from_member), 'إلى': memName(r.to_member), 'الموعد': r.due, 'الحالة': REQ_STATUS[r.status][0], 'جولات التعديل': r.rounds, 'تاريخ الطلب': dt(r.created_at), 'تاريخ التسليم': dt(r.done_at), 'التسليم': r.result_url }));
   const camps = S.camps.map(c => { const s = campStats(c.id); return { 'الحملة': c.name, 'الحالة': CAMP_ST[c.status || 'active'][0], 'المطلوب': c.target_total, 'موزّع': S.quotas.filter(q => q.campaign_id === c.id).reduce((x, q) => x + q.quota, 0), 'انرسل': s.sent.length, 'معتمد': s.approved.length, 'مرفوض': s.rejected.length, 'استلموا': s.approved.filter(d => d.delivered_at).length, 'نشروا': s.approved.filter(allDelivered).length }; });
