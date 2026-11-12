@@ -20,7 +20,7 @@ const ACC_TYPES = ['مقيم عطور عربي', 'مقيم عطور أجنبي',
 const PLATS = [{ k: 'tt', n: 'تيك توك' }, { k: 'sn', n: 'سناب شات' }, { k: 'ig', n: 'انستقرام' }];
 const PL = { tt: 'تيك توك', sn: 'سناب شات', ig: 'انستقرام' };
 const CONTACT_CH = ['تيك توك', 'سناب شات', 'انستقرام', 'يوتيوب', 'البريد الإلكتروني', 'واتساب', 'اتصال'];
-const CONTACT_RES = ['ما رد', 'رد وجاري التفاوض', 'ما اتفقنا بسبب السعر', 'رفض التعاون', 'تم الاتفاق'];
+const CONTACT_RES = ['تم التواصل', 'ما رد', 'رد وجاري التفاوض', 'ما اتفقنا بسبب السعر', 'رفض التعاون', 'تم الاتفاق'];
 const AD_TYPES = ['منزلي', 'خارجي', 'حضوري'];
 const ACQ = { draft: ['مسودة', ''], pending: ['بانتظار المراجعة', 'acc'], needs_edit: ['يحتاج تعديل', 'warn'], approved: ['معتمد: تواصل وفاوض', 'good'], rejected: ['مرفوض', 'bad'], none: ['من الحملات', ''] };
 const REQ_KINDS = { design: 'تصميم', ship: 'شحن', ad: 'إطلاق إعلان', snap: 'سناب', social: 'سوشيال ميديا', quota: 'زيادة حصة ترشيح', other: 'أخرى' };
@@ -123,6 +123,17 @@ const adName = d => [camp(d.campaign_id).name, d.name, d.hook, memName(d.member_
 const adNameFor = (d, p) => adName(d) + ' | ' + PL[p] + (p === 'sn' ? (d.sn_user ? ' | ' + d.sn_user : '') : (d[p + '_code'] ? ' | ' + d[p + '_code'] : ''));
 const intakeLink = d => location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'intake.html?t=' + d.intake_token;
 const waLink = (phone, txt) => { let p = String(phone || '').replace(/\D/g, '').replace(/^00/, '').replace(/^0(?=5)/, '966'); if (/^5\d{8}$/.test(p)) p = '966' + p; if (p.length < 9) p = ''; return p ? 'https://wa.me/' + p + '?text=' + encodeURIComponent(txt) : ''; };
+const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
+/* روابط حسابات المؤثر (تيك توك، سناب، انستقرام، يوتيوب) تنفتح في تبويب جديد */
+function acctUrls(d, I) {
+  d = d || {}; I = I || {}; const out = [], h = d.handle || I.handle, clean = x => String(x || '').trim().replace(/^@/, '');
+  const tt = safeUrl(I.tiktok_url) || (h ? 'https://www.tiktok.com/@' + encodeURIComponent(h) : ''); if (tt) out.push(['تيك توك', tt]);
+  const sn = clean(d.sn_user || I.snap_user); if (sn) out.push(['سناب شات', safeUrl(sn) || 'https://www.snapchat.com/add/' + encodeURIComponent(sn)]);
+  const ig = clean(I.ig_user); if (ig) out.push(['انستقرام', safeUrl(ig) || 'https://www.instagram.com/' + encodeURIComponent(ig)]);
+  if (safeUrl(I.yt_url)) out.push(['يوتيوب', safeUrl(I.yt_url)]);
+  return out;
+}
+const acctLinks = (d, I) => acctUrls(d, I).map(([n, u]) => `<a class="btn sm" href="${esc(u)}" target="_blank" rel="noopener">افتح ${n} ↗</a>`).join('');
 const isContinuing = i => !!i && S.deals.some(d => d.influencer_id === i.id && allDelivered(d));
 
 /* ================= البيانات ================= */
@@ -291,6 +302,7 @@ function openInfl(id) {
   const diff = (i.price_before != null && i.price_after != null) ? i.price_before - i.price_after : null;
   modal(`<div class="row between"><div><h2>${esc(i.name)}</h2><div class="muted small">${esc([i.acc_type, i.account_status, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by) + ' ' + (i.nominated_on || '')].filter(Boolean).join(' · '))}</div></div>
    <div class="row"><span class="pill ${(ACQ[st] || ['', ''])[1]}">${i.agreed_at ? 'تم الاتفاق' : (ACQ[st] || [st])[0]}</span><button class="btn" id="f_x" type="button">إغلاق</button></div></div>
+  ${acctLinks(null, i) ? `<div class="row">${acctLinks(null, i)}</div>` : ''}
   ${(st === 'needs_edit' || st === 'rejected') && i.acq_reason.trim() ? `<div class="dup"><b>${st === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(i.acq_reason)}</div>` : ''}
 
   <details class="sec ${st === 'draft' || st === 'needs_edit' ? 'c' : 'd'}" ${st === 'draft' || st === 'needs_edit' ? 'open' : ''}><summary><span class="idx">1</span><span class="ttl">بيانات الترشيح</span><span class="meta">${i.acq_sent_at ? 'أُرسل ' + dShort(i.acq_sent_at) : ''}</span></summary><div class="body">
@@ -553,7 +565,7 @@ const QL = {
   members: 'حسابات جديدة تنتظر التفعيل', acq_review: 'استقطاب ينتظر اعتمادك', appr: 'ترشيحات حملات تنتظر اعتمادك', quota_req: 'طلبات زيادة حصة',
   acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
   acq_contact: 'معتمد: تواصل وفاوض', intake: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', ship_send: 'جاهزة للشحن', ship_wait: 'في الطريق: سجّل الوصول', ship_fail: 'تعذّر التسليم: تابعها',
-  video: 'وصله المنتج: نسّق المقطع', video_fix: 'مسودات رجعت للتعديل', draft: 'مسودات مقاطع تنتظر اعتمادك', post: 'سجّل النزول والكود لكل منصة',
+  video: 'وصله المنتج: أرسل المقطع الخام للمراجعة', video_fix: 'مقاطع رجعت لك للتعديل', draft: 'مقاطع خام تنتظر اعتمادك', post: 'المقطع معتمد: سجّل النزول والكود لكل منصة',
   launch: 'نزل: شغّل الإعلان', snap_follow: 'محتوى نزل: سلّمه للميديا باير وتابع التشغيل', req_in: 'طلبات عليك', req_fix: 'طلبات رجعت لك للتعديل', req_new: 'تحديثات جديدة على طلباتك (ردود، تعديلات، تسليمات)', req_review: 'طلبات سلّموها لك: راجعها', pay: 'تنتظر الدفع', park: 'احتياط'
 };
 const QO = ['members', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'launch', 'snap_follow', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'park'];
@@ -608,12 +620,13 @@ function updateMineCount() { if (!S.me) return; const n = countFor(S.me.id) + (i
 function dealRow(x, bulk, k) {
   const { d, i, p } = x; const late = lateness(d, i); const age = p ? ageOf(d[p + '_at']) : stepAge(d, i);
   const miss = k === 'post' ? platKeys(d).filter(q => !delivered(d, q)).map(q => 'باقي ' + PL[q]).join('، ') : '';
-  const sub = [camp(d.campaign_id).name || 'بدون حملة', d.member_id !== S.me.id ? memName(d.member_id) : '', p ? PL[p] + (p === 'sn' ? (d.sn_user ? ' · ' + d.sn_user : '') : (d[p + '_code'] ? ' · ' + d[p + '_code'] : '')) : platText(platKeys(d)), miss, d.decision_reason && d.decision_reason.trim() && k === 'camp_fix' ? 'المطلوب: ' + d.decision_reason : '', d.price != null ? fmt(d.price) + ' ' + (d.currency || '') : ''].filter(Boolean).join(' · ');
+  const sub = [camp(d.campaign_id).name || 'بدون حملة', d.member_id !== S.me.id ? memName(d.member_id) : '', p ? PL[p] + (p === 'sn' ? (d.sn_user ? ' · ' + d.sn_user : '') : (d[p + '_code'] ? ' · ' + d[p + '_code'] : '')) : platText(platKeys(d)), miss, d.decision_reason && d.decision_reason.trim() && k === 'camp_fix' ? 'المطلوب: ' + d.decision_reason : '', k === 'video_fix' && (d.draft_feedback || '').trim() ? 'المطلوب: ' + d.draft_feedback : '', d.price != null ? fmt(d.price) + ' ' + (d.currency || '') : ''].filter(Boolean).join(' · ');
   const apprBtns = k === 'appr' ? `<button class="btn sm danger" data-dq="reject" data-id="${d.id}" type="button">رفض</button><button class="btn sm" data-dq="needs_edit" data-id="${d.id}" type="button">تعديل</button>` : '';
+  const au = (k === 'appr' || k === 'draft') ? acctUrls(d, infl(d.influencer_id))[0] : null; const acctBtn = au ? `<a class="btn sm" href="${esc(au[1])}" target="_blank" rel="noopener">الحساب ↗</a>` : '';
   const launchBtn = (k === 'launch' || k === 'snap_follow') ? `<button class="btn sm good" data-launch="${p}" data-id="${d.id}" type="button">انطلق</button>` : '';
-  return `<div class="qrow ${late}">${bulk ? `<input type="checkbox" data-bulk="${d.id}" aria-label="تحديد">` : '<span></span>'}<div><div class="t">${esc(d.name)}</div><div class="sub">${esc(sub)}</div></div><div class="acts row" style="gap:6px;flex-wrap:nowrap">${apprBtns}${launchBtn}<span class="pill ${late === 'late' ? 'bad' : late === 'soon' ? 'warn' : ''}">${age} يوم</span><button class="btn sm" data-open="${d.id}" type="button">افتح</button></div></div>`;
+  return `<div class="qrow ${late}">${bulk ? `<input type="checkbox" data-bulk="${d.id}" aria-label="تحديد">` : '<span></span>'}<div><div class="t">${esc(d.name)}</div><div class="sub">${esc(sub)}</div></div><div class="acts row" style="gap:6px;flex-wrap:nowrap">${acctBtn}${apprBtns}${launchBtn}<span class="pill ${late === 'late' ? 'bad' : late === 'soon' ? 'warn' : ''}">${age} يوم</span><button class="btn sm" data-open="${d.id}" type="button">افتح</button></div></div>`;
 }
-function inflRow(i) { return `<div class="qrow"><span></span><div><div class="t">${esc(i.name)}</div><div class="sub">${esc([i.acc_type, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by), i.acq_reason && i.acq_reason.trim() ? 'المطلوب: ' + i.acq_reason : ''].filter(Boolean).join(' · '))}</div></div><div class="acts row" style="gap:6px"><span class="pill">${ageOf(i.acq_sent_at || i.created_at)} يوم</span><button class="btn sm" data-openinfl="${i.id}" type="button">افتح</button></div></div>`; }
+function inflRow(i) { return `<div class="qrow"><span></span><div><div class="t">${esc(i.name)}</div><div class="sub">${esc([i.acc_type, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by), i.acq_reason && i.acq_reason.trim() ? 'المطلوب: ' + i.acq_reason : ''].filter(Boolean).join(' · '))}</div></div><div class="acts row" style="gap:6px">${acctUrls(null, i)[0] ? `<a class="btn sm" href="${esc(acctUrls(null, i)[0][1])}" target="_blank" rel="noopener">الحساب ↗</a>` : ''}<span class="pill">${ageOf(i.acq_sent_at || i.created_at)} يوم</span><button class="btn sm" data-openinfl="${i.id}" type="button">افتح</button></div></div>`; }
 function renderMine() {
   const as = $('mineAs'); let id = S.me.id;
   if (isAdmin()) { const v = as.value || S.me.id; as.innerHTML = `<option value="${S.me.id}">أنا</option><option value="team">ملخص الفريق</option>` + active().filter(m => m.id !== S.me.id).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join(''); as.value = [...as.options].some(o => o.value === v) ? v : S.me.id; id = as.value; }
@@ -631,7 +644,7 @@ function renderMine() {
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }
     else rows = L.map(x => dealRow(x, !!b, k)).join('');
-    return `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b ? `<span style="margin-inline-start:auto" class="row"><label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button></span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
+    return `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b ? `<span style="margin-inline-start:auto" class="row">${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button>' : ''}<label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button></span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
   }).join('') || '<div class="empty">ما عندك شي معلّق الحين. ابدأ من «+ ترشيح» أو اطلب شي من زميل من «+ طلب».</div>';
 }
 function renderTeam() {
@@ -662,6 +675,17 @@ $('mineBody').addEventListener('click', async e => {
   }
 });
 
+/* كشف الشحن: كل اللي في مرحلة الشحن (جاهز، في الطريق، تعذّر) ببيانات المستلم والحملة والمنتج */
+function shipSheet() {
+  const dt = t => t ? dtX(t) : '';
+  const L = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval === 'approved' && curStep(d) === SI.ship).sort((a, b) => new Date(a.approved_at || a.created_at) - new Date(b.approved_at || b.created_at));
+  if (!L.length) return toast('ما فيه شحنات مفتوحة الحين', true);
+  const rows = L.map((d, n) => ({ 'م': n + 1, 'الحالة': d.ship_failed_at ? 'تعذّر التسليم' : d.shipped_at ? 'انشحن (في الطريق)' : 'جاهز للشحن', 'المؤثر': d.name, 'اسم المستلم': d.rcv_name || d.name, 'جوال المستلم': d.rcv_phone || d.phone, 'الدولة': d.country, 'المدينة': d.rcv_city, 'الحي والرمز المختصر': [d.address, d.short_code].filter(Boolean).join(' – '), 'الحملة': camp(d.campaign_id).name || '', 'المنتج': camp(d.campaign_id).product || '', 'صانع المحتوى': memName(d.member_id), 'تاريخ الاعتماد': dt(d.approved_at), 'تاريخ الشحن': dt(d.shipped_at), 'رقم التتبع': d.tracking, 'ملاحظة الشحن': d.ship_note }));
+  const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(10, Math.min(40, k.length + 6)) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'كشف الشحن'); XLSX.writeFile(wb, `كشف الشحن ${today()}.xlsx`);
+}
+$('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); });
+
 /* ================= ملف المشاركة في الحملة ================= */
 function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${i === SI.video && draftPending(d) ? ' (عند متعب)' : ''}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
 function openDeal(id) {
@@ -677,9 +701,10 @@ function openDeal(id) {
   const platCard = p => `<div class="card ${delivered(d, p) ? 'ok' : ''}"><div class="hd"><b>${PL[p]}</b>${delivered(d, p) ? `<span class="pill good">نزل ${dShort(d[p + '_at'])}</span>` : '<span class="pill">ما نزل</span>'}${launched(d, p) ? `<span class="pill good">انطلق ${dShort(d[p + '_live_at'])}</span>` : ''}</div>
      <div class="grid2">${p === 'sn' ? `<div class="field"><label>يوزر سناب شات *</label><input type="text" id="f_sn_user" dir="ltr" value="${v('sn_user')}"></div><div class="field"><label>رابط أو كود سناب (اختياري)</label><input type="text" id="f_sn_code" dir="ltr" value="${v('sn_code')}"></div>`
        : `<div class="field"><label>كود ${PL[p]} ${p === 'tt' ? '(Spark Code)' : ''} *</label><input type="text" id="f_${p}_code" dir="ltr" value="${v(p + '_code')}"></div>`}</div>
-     <div class="row">${mine && !delivered(d, p) ? `<button class="btn good sm" data-act="dl_${p}" type="button">نزل على ${PL[p]} اليوم</button>` : ''}${mine && delivered(d, p) ? `<button class="btn sm" data-act="code_${p}" type="button">حفظ التعديل</button>` : ''}${media && delivered(d, p) && !launched(d, p) ? `<button class="btn sm primary" data-act="lv_${p}" type="button">انطلق الإعلان</button>` : ''}
+     <div class="row">${mine && !delivered(d, p) ? (d.video_ok_at || adm ? `<button class="btn good sm" data-act="dl_${p}" type="button">نزل على ${PL[p]} اليوم</button>` : '<span class="muted small">ينفتح بعد اعتماد المقطع الخام</span>') : ''}${mine && delivered(d, p) ? `<button class="btn sm" data-act="code_${p}" type="button">حفظ التعديل</button>` : ''}${media && delivered(d, p) && !launched(d, p) ? `<button class="btn sm primary" data-act="lv_${p}" type="button">انطلق الإعلان</button>` : ''}
        ${delivered(d, p) ? `<div class="copybox" style="flex:1"><code>${esc(adNameFor(d, p))}</code><button class="btn sm" data-copy="${esc(adNameFor(d, p))}" type="button">نسخ التسمية</button></div>` : ''}</div></div>`;
   modal(`<div class="row between"><div><h2>${esc(d.name)}</h2><div class="muted small">${esc([camp(d.campaign_id).name, memName(d.member_id), platText(keys), d.ad_type, d.handle ? '@' + d.handle : ''].filter(Boolean).join(' · '))}</div></div><div class="row">${I ? `<button class="btn sm" data-openinfl="${I.id}" type="button">ملف المؤثر</button>` : ''}<button class="btn" id="dClose" type="button">إغلاق</button></div></div>
+  ${acctLinks(d, I) ? `<div class="row">${acctLinks(d, I)}</div>` : ''}
   ${stepper}
   ${d.decision_reason && d.decision_reason.trim() && ['needs_edit', 'rejected'].includes(d.approval) ? `<div class="dup"><b>${d.approval === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(d.decision_reason)}</div>` : ''}
   ${d.closed_at && d.approval !== 'rejected' ? `<div class="dup">مغلق: ${esc(d.closed_reason)}</div>` : ''}
@@ -708,9 +733,14 @@ function openDeal(id) {
    ${d.intake_at ? `<div class="small">عبّاها المؤثر بنفسه ${dShort(d.intake_at)}</div>` : ''}${adm ? '<div id="bankBox"></div>' : ''}`, hasAddress(d) ? 'العنوان جاهز' : d.intake_at ? 'عبّاها المؤثر' : '')}
   ${sec(3, `<div class="grid2"><div class="field"><label for="f_tracking">رقم التتبع</label><input type="text" id="f_tracking" dir="ltr" value="${v('tracking')}"></div><div class="field"><label for="f_ship_note">ملاحظة الشحن</label><input type="text" id="f_ship_note" value="${v('ship_note')}"></div></div>
    ${ship || adm ? `<div class="row"><button class="btn" data-act="shipped" type="button">${d.shipped_at ? 'انشحن ' + dShort(d.shipped_at) : 'انشحن اليوم'}</button><button class="btn good" data-act="delivered" type="button">${d.delivered_at ? 'وصل ' + dShort(d.delivered_at) : 'وصل اليوم'}</button><button class="btn danger" data-act="failed" type="button">${d.ship_failed_at ? 'تعذّر ' + dShort(d.ship_failed_at) : 'تعذّر التسليم'}</button></div>` : `<div class="muted small">${d.delivered_at ? 'وصل ' + dShort(d.delivered_at) : d.shipped_at ? 'انشحن ' + dShort(d.shipped_at) : 'عند صقر'}</div>`}`, d.delivered_at ? 'وصل ' + dShort(d.delivered_at) : d.ship_failed_at ? 'تعذّر' : d.shipped_at ? 'في الطريق' : '')}
-  ${sec(4, `<div class="grid2"><div class="field"><label for="f_draft_url">رابط المسودة (إذا متعب يراجع قبل النشر)</label><input type="url" id="f_draft_url" dir="ltr" value="${v('draft_url')}"></div><div class="field"><label for="f_post_url">رابط المقطع على تيك توك</label><input type="url" id="f_post_url" dir="ltr" value="${v('post_url')}"></div></div>
-   <div class="row">${mine && !draftPending(d) && !d.video_ok_at && !allDelivered(d) ? '<button class="btn sm" data-act="draft" type="button">أرسل المسودة لمتعب</button>' : ''}${appr && draftPending(d) ? '<button class="btn sm good" data-act="vok" type="button">اعتماد المقطع</button><button class="btn sm danger" data-act="vfix" type="button">يرجع للتعديل</button>' : ''}${d.rounds ? `<span class="pill warn">${d.rounds} جولة تعديل</span>` : ''}${d.video_ok_at ? '<span class="pill good">المقطع معتمد</span>' : ''}</div>
-   <div class="muted small">كل منصة لها تسليم مستقل. أول ما تنزل منصة، تروح للميديا باير يشغّلها، حتى لو الباقي ما نزل.</div>
+  ${sec(4, `<div class="card ${d.video_ok_at ? 'ok' : draftPending(d) ? 'part' : ''}"><div class="hd"><b>أولاً: مراجعة المقطع الخام</b>${d.video_ok_at ? `<span class="pill good">معتمد ${dShort(d.video_ok_at)}</span>` : draftPending(d) ? `<span class="pill acc">عند ${esc(withRole('approver').map(m => m.name).join('، ') || 'متعب')} للمراجعة من ${dShort(d.draft_at)}</span>` : '<span class="pill">ما انرسل للمراجعة</span>'}${d.rounds ? `<span class="pill warn">${d.rounds} جولة تعديل</span>` : ''}</div>
+     ${!d.video_ok_at && !draftPending(d) && d.rounds && (d.draft_feedback || '').trim() ? `<div class="dup"><b>المطلوب تعديله في المقطع:</b> ${esc(d.draft_feedback)}</div>` : ''}
+     <div ${mine && !d.video_ok_at && !draftPending(d) ? '' : 'inert'} style="display:grid;gap:12px">
+      <div class="field"><label for="f_draft_url">رابط المقطع الخام (قوقل درايف أو أي رابط يفتح) *</label><input type="url" id="f_draft_url" dir="ltr" value="${v('draft_url')}" placeholder="https://drive.google.com/..."></div>
+      <div class="field"><label for="f_draft_note">ملاحظاتك على المقطع (وش أعجبك، وش تشوف يتعدّل)</label><textarea id="f_draft_note">${v('draft_note')}</textarea></div></div>
+     <div class="row">${safeUrl(d.draft_url) ? `<a class="btn sm" href="${esc(safeUrl(d.draft_url))}" target="_blank" rel="noopener">افتح المقطع الخام ↗</a>` : ''}${mine && !draftPending(d) && !d.video_ok_at && !allDelivered(d) ? `<button class="btn sm primary" data-act="draft" type="button">${d.rounds ? 'أعد إرسال المقطع للمراجعة' : 'أرسل المقطع للمراجعة'}</button>` : ''}${appr && draftPending(d) ? '<button class="btn sm good" data-act="vok" type="button">اعتماد المقطع</button><button class="btn sm danger" data-act="vfix" type="button">يرجع للتعديل</button>' : ''}</div></div>
+   <div class="field"><label for="f_post_url">رابط المقطع على تيك توك (بعد النشر)</label><input type="url" id="f_post_url" dir="ltr" value="${v('post_url')}"></div>
+   <div class="muted small">ثانياً: بعد اعتماد المقطع، سجّل النزول والكود لكل منصة. كل منصة لها تسليم مستقل. أول ما تنزل منصة، تروح للميديا باير يشغّلها، حتى لو الباقي ما نزل.</div>
    <div style="display:grid;gap:10px">${keys.map(platCard).join('') || '<div class="muted">حدّد منصة التنزيل في المرحلة 1.</div>'}</div>`, allDelivered(d) ? 'نزل على كل المنصات' : keys.filter(p => delivered(d, p)).map(p => PL[p]).join('، '))}
   ${sec(5, `<div class="muted small">التشغيل لكل منصة من بطاقتها فوق. هنا الملخص.</div><div class="row">${keys.map(p => `<span class="pill ${launched(d, p) ? 'good' : delivered(d, p) ? 'warn' : ''}">${PL[p]}: ${launched(d, p) ? 'انطلق' : delivered(d, p) ? 'ينتظر التشغيل' : 'ما نزل'}</span>`).join('')}</div>`, allLaunched(d) ? 'انطلق كله' : '')}
   <div class="row between">${adm ? `<button class="btn sm" data-act="paid" type="button">${d.paid_at ? 'دُفع ' + dShort(d.paid_at) : 'تم الدفع'}</button>` : '<span></span>'}
@@ -731,9 +761,8 @@ function openDeal(id) {
       shipped: () => ({ tracking: val('tracking'), ship_note: val('ship_note'), shipped_at: d.shipped_at || nowIso(), ship_failed_at: null }),
       delivered: () => ({ tracking: val('tracking'), ship_note: val('ship_note'), shipped_at: d.shipped_at || nowIso(), delivered_at: d.delivered_at || nowIso(), ship_failed_at: null }),
       failed: () => { if (!val('ship_note')) { toast('اكتب سبب تعذّر التسليم في «ملاحظة الشحن»', true); return null; } return { ship_note: val('ship_note'), ship_failed_at: nowIso() }; },
-      draft: () => { if (!val('draft_url')) { toast('حط رابط المسودة', true); return null; } return { draft_url: val('draft_url'), draft_at: nowIso() }; },
-      vok: () => ({ video_ok_at: nowIso() }),
-      vfix: () => ({ draft_at: null, rounds: (d.rounds || 0) + 1 }),
+      draft: () => { if (!safeUrl(val('draft_url'))) { toast('حط رابط المقطع الخام (يبدأ بـ https)', true); return null; } return { draft_url: val('draft_url'), draft_note: val('draft_note'), draft_at: nowIso() }; },
+      vok: () => ({ video_ok_at: nowIso(), draft_feedback: '' }),
       paid: () => ({ paid_at: d.paid_at ? null : nowIso() }),
       close: () => ({ closed_at: nowIso(), closed_reason: 'ما رد / ألغي' }),
       reopen: () => ({ closed_at: null, closed_reason: '', approval: d.approval === 'rejected' ? 'pending' : d.approval, sent_at: d.approval === 'rejected' ? null : d.sent_at })
@@ -742,6 +771,7 @@ function openDeal(id) {
       const b = e.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act; let ch;
       if (a === 'reject' || a === 'needs_edit') { b.disabled = true; const r = await decideDeal(d, a); b.disabled = false; if (r) { toast('انحفظ القرار'); openDeal(d.id); } return; }
       if (a.startsWith('lv_')) { b.disabled = true; if (await launchPlat(d, a.slice(3))) { toast('انسجّل التشغيل'); openDeal(d.id); } return; }
+      if (a === 'vfix') { const why = await reasonBox('وش المطلوب يتعدّل في المقطع؟', true); if (why == null) return; b.disabled = true; const r = await saveDeal(d.id, { draft_at: null, rounds: (d.rounds || 0) + 1, draft_feedback: why.trim() }); b.disabled = false; if (r) { toast('رجع لصانع المحتوى مع ملاحظتك'); openDeal(d.id); } return; }
       if (a.startsWith('dl_')) ch = dl(a.slice(3));
       else if (a.startsWith('code_')) { const p = a.slice(5); ch = p === 'sn' ? { sn_user: val('sn_user'), sn_code: val('sn_code') } : { [p + '_code']: val(p + '_code') }; }
       else ch = A[a]();
