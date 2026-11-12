@@ -15,6 +15,15 @@ const STEPS = [
   { k: 'live', n: 'التشغيل', who: 'media' }
 ];
 const SI = Object.fromEntries(STEPS.map((s, i) => [s.k, i]));
+/* وش بعد كل مرحلة؟ يظهر داخل البطاقة وفي «كيف يمشي الشغل؟» */
+const NEXT = {
+  nom: 'بعد الإرسال تروح للاعتماد، وأول ما ينقرر يرجع لك الرد في «مهامي».',
+  appr: 'بعد الاعتماد ترجع لصانع المحتوى: يكمّل عنوان الشحن أو يرسل رابط البيانات للمؤثر.',
+  intake: 'أول ما يكتمل العنوان (جوال + مدينة + حي) تنتقل تلقائياً للشحن عند صقر في «مهامي» حقته.',
+  ship: 'بعد تسجيل «وصلت» ترجع لصانع المحتوى في «مهامي»: يصوّر ويرسل المقطع الخام للمراجعة.',
+  video: 'المقطع الخام يروح للاعتماد، وبعد اعتماده تنفتح خانات النزول والكود لكل منصة — وكل منصة تنزل تروح للميديا باير ولزياد تلقائياً.',
+  live: 'بعد تشغيل كل المنصات يكتمل الملف ويدخل مرحلة الدفع: موافقة عبدالمحسن، ثم كشف متعب للمالية.'
+};
 const DEF_SLA = { nom: 3, appr: 2, intake: 3, ship: 7, video: 10, live: 2 };
 const ACC_TYPES = ['مقيم عطور عربي', 'مقيم عطور أجنبي', 'صانع محتوى', 'فلوقات وترندات', 'بيعي', 'يوتيوب', 'مهتم بكرة القدم'];
 const PLATS = [{ k: 'tt', n: 'تيك توك' }, { k: 'sn', n: 'سناب شات' }, { k: 'ig', n: 'انستقرام' }];
@@ -70,7 +79,7 @@ function friendly(err) {
   if (/already registered/i.test(m)) return 'هذا الإيميل مسجّل من قبل. ادخل بكلمة المرور بدل التسجيل.';
   return 'ما قدرنا نكمّل هذي الخطوة. حدّث الصفحة وجرّب مرة ثانية. ' + CONTACT;
 }
-let toastT; function toast(m, bad) { const t = $('toast'); t.textContent = m; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3200); }
+let toastT; function toast(m, bad) { const t = $('toast'); t.textContent = m; t.className = 'toast' + (bad ? ' bad' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, Math.max(3200, Math.min(10000, String(m).length * 60))); }
 async function copyTxt(t) { try { await navigator.clipboard.writeText(t); toast('انسخ'); } catch (e) { toast('ما قدرت أنسخ، ظلّل النص وانسخه', true); } }
 document.addEventListener('click', e => { const b = e.target.closest('[data-copy]'); if (b) copyTxt(b.dataset.copy); });
 const opts = (list, sel) => list.map(v => `<option ${v === sel ? 'selected' : ''}>${esc(v)}</option>`).join('');
@@ -246,6 +255,25 @@ $('newDeal').onclick = () => modal(`<h2>ترشيح جديد</h2><div class="choo
   <button type="button" id="chCamp"><b>ترشيح للحملة</b><span class="muted small">ترشّح حساباتك المطلوبة لحملة معيّنة دفعة وحدة، وترسلها للاعتماد (${esc(apprFor(S.me.id))}).</span></button></div>
   <button class="btn" id="chX" type="button">إلغاء</button>`, () => { $('chAcq').onclick = () => openAcqNew(); $('chCamp').onclick = () => openCampNom(); $('chX').onclick = closeModal; }, true);
 $('acqNew').onclick = () => openAcqNew();
+/* دليل سريع داخل الموقع: القاعدة الذهبية + المراحل + دور المستخدم الحالي */
+$('howBtn').onclick = () => {
+  const roles = (S.me && S.me.roles) || [];
+  const R = [];
+  if (roles.includes('creator')) R.push(['صانع المحتوى (دورك)', 'تبدأ من «+ ترشيح»: استقطاب جديد أو ترشيح لحملة. التواصل والتفاوض تسجّله في ملف المؤثر من تبويب «الاستقطاب». وكل اللي يحتاج خطوة منك — تعديل، منتج وصل، مقطع انعتمد — يطلع لك في «مهامي» تلقائياً.']);
+  if (roles.includes('approver')) R.push(['الاعتماد (دورك)', 'كل اللي ينتظر قرارك يجيك في «مهامي»: استقطابات، ترشيحات حملات، مقاطع خام، طلبات زيادة حصة، وكشوف الدفع المعتمدة. وشغلك أنت الشخصي يعتمده عبدالمحسن (فصل مهام).']);
+  if (roles.includes('shipper')) R.push(['الشحن (دورك)', 'الجاهز للشحن يجيك في «مهامي» تحت «جاهزة للشحن»: نزّل «كشف سلاسل Excel» وارفعه لشركة الشحن دفعة وحدة، وعلّم «انشحن» و«وصلت» بالمجموعة. المتعذر تابعه من «تعذّر التسليم».']);
+  if (roles.includes('media')) R.push(['الميديا باير (دورك)', 'كل منصة نزل عليها محتوى تجيك في «مهامي» تحت «نزل: شغّل الإعلان» — شغّل واضغط «انطلق».']);
+  if (roles.includes('snap')) R.push(['منسق المحتوى (دورك)', 'كل محتوى نزل يجيك في «مهامي»، ومنه تنزّل «شيت التشغيل Excel» وتلصقه في Content Tracker — الكود والتسميات يولدها الشيت نفسه.']);
+  if (roles.includes('design') || roles.includes('social') || roles.includes('owned')) R.push(['الطلبات (دورك)', 'شغلك يجيك من «+ طلب»: الطلب يوصلك في «مهامي» و«الطلبات»، تسلّم من نفس الطلب، والتعديلات ترجع لك بإشعار.']);
+  if (isAdmin()) R.push(['عبدالمحسن', 'اعتماد شغل متعب، موافقات الدفع، تفعيل الحسابات الجديدة، وزيادة «العدد المطلوب» للحملات — كلها في «مهامي». والمتابعة من «لوحة الأداء».']);
+  modal(`<div class="row between"><h2>كيف يمشي الشغل؟</h2><button class="btn" id="howX" type="button">إغلاق</button></div>
+   <div class="note"><b>القاعدة الذهبية:</b> كل شي ينتظر خطوة منك يجيك في تبويب <b>«مهامي»</b> — افتحه أول ما تدخل. العداد الأحمر = عدد اللي ينتظرك. وأول ما تخلّص خطوتك، النظام ينقل الملف للشخص التالي بنفسه: ما فيه تسليم يدوي ولا واتساب.</div>
+   <h3>مراحل الحملة: المسؤول، ووين تروح بعده</h3>
+   <div class="tw"><table><thead><tr><th>#</th><th>المرحلة</th><th>المسؤول</th><th>إذا خلصت، وش يصير؟</th></tr></thead><tbody>
+   ${STEPS.map((s, j) => `<tr><td>${j + 1}</td><td>${s.n}</td><td>${esc(stepWho(s))}</td><td class="small muted">${NEXT[s.k]}</td></tr>`).join('')}</tbody></table></div>
+   ${R.map(([t, x]) => `<div class="card"><div class="hd"><b>${t}</b></div><div class="small">${x}</div></div>`).join('')}
+   <div class="note small">وداخل كل ملف، المرحلة المفتوحة فيها سطر «وش بعد؟» يقول لك وين بتروح خطوتك بالضبط.</div>`, root => { root.querySelector('#howX').onclick = closeModal; }, true);
+};
 
 /* ================= الاستقطاب: تسجيل جديد ================= */
 function dupInfl(handle, url, phone, exceptId) {
@@ -328,7 +356,7 @@ function openInfl(id) {
     <div class="field"><label for="i_tiktok_url">رابط حساب تيك توك</label><input type="url" id="i_tiktok_url" dir="ltr" value="${v('tiktok_url')}"></div>
     <div class="field"><label for="i_handle">يوزر تيك توك</label><input type="text" id="i_handle" dir="ltr" value="${v('handle')}"></div>
    </div>
-   ${editable1 && st !== 'approved' && st !== 'none' ? `<div class="row"><button class="btn primary" data-a="send" type="button">${st === 'needs_edit' ? 'أعد الإرسال للمراجعة' : 'إرسال الترشيح للمراجعة'}</button><button class="btn" data-a="save1" type="button">حفظ</button></div>` : editable1 ? '<div class="row"><button class="btn" data-a="save1" type="button">حفظ</button></div>' : ''}
+   ${editable1 && st !== 'approved' && st !== 'none' ? `<div class="note small"><b>وش بعد؟</b> بعد الإرسال يراجعه ${esc(apprFor(i.nominated_by))}، وأول ما يُعتمد تنفتح لك مرحلة «التواصل والتفاوض» في نفس هذا الملف.</div><div class="row"><button class="btn primary" data-a="send" type="button">${st === 'needs_edit' ? 'أعد الإرسال للمراجعة' : 'إرسال الترشيح للمراجعة'}</button><button class="btn" data-a="save1" type="button">حفظ</button></div>` : editable1 ? '<div class="row"><button class="btn" data-a="save1" type="button">حفظ</button></div>' : ''}
   </div></details>
 
   ${st !== 'none' ? `<details class="sec ${st === 'approved' ? 'd' : st === 'pending' ? 'c' : ''}" ${st === 'pending' ? 'open' : ''}><summary><span class="idx">2</span><span class="ttl">الاعتماد (${esc(apprFor(i.nominated_by))})</span><span class="meta">${i.acq_decided_at ? dShort(i.acq_decided_at) + ' · ' + esc(memName(i.acq_decided_by)) : ''}</span></summary><div class="body">
@@ -366,7 +394,7 @@ function openInfl(id) {
      <div class="field"><label for="i_currency">العملة</label><select id="i_currency">${opts(['SAR', 'AED', 'KWD', 'USD'], i.currency || 'SAR')}</select></div>
     </div>
     <div class="muted small" id="i_diff">${diff != null ? `وفّرنا ${fmt(diff)} ${esc(i.currency || 'SAR')} (${pct(diff, i.price_before)}٪)` : ''}</div>
-    ${owner && open2 ? `<div class="row"><button class="btn" data-a="save2" type="button">حفظ</button>${!i.agreed_at ? '<button class="btn good" data-a="agree" type="button">تم الاتفاق</button>' : ''}</div>` : ''}
+    ${owner && open2 ? `<div class="note small"><b>وش بعد؟</b> سجّل كل محاولة تواصل أول بأول. وأول ما تتفقون على السعر النهائي: «تم الاتفاق» ثم «رشّحه لحملة» — هناك يعتمد السعر ويدخل خط الإنتاج.</div><div class="row"><button class="btn" data-a="save2" type="button">حفظ</button>${!i.agreed_at ? '<button class="btn good" data-a="agree" type="button">تم الاتفاق</button>' : ''}</div>` : ''}
    </div>
   </div></details>
 
@@ -406,7 +434,17 @@ function openInfl(id) {
       if (a === 'save2') { ch = stage2(false); if (!ch) return; }
       if (a === 'agree') { ch = stage2(true); if (!ch) return; if (ch.price_after == null) return toast('اكتب السعر بعد التفاوض', true); ch.agreed_at = nowIso(); }
       if (!ch) return; b.disabled = true; const r = await saveInfl(i.id, ch); b.disabled = false;
-      if (r) { toast(a === 'agree' ? 'تم الاتفاق. تقدر الحين ترشّحه لحملة' : 'انحفظ'); openInfl(i.id); }
+      if (r) {
+        const IM = {
+          send: `انرسل للمراجعة ✓ — بيظهر عند ${apprFor(i.nominated_by)} في «مهامي»، وأول ما يقرر يوصلك الرد في «مهامي» حقتك`,
+          approve: 'انعتمد ✓ — رجع لصاحبه في «مهامي» تحت «معتمد: تواصل وفاوض»',
+          needs_edit: 'رجع لصاحبه مع المطلوب تعديله في «مهامي» حقته',
+          reject: 'انرفض — بيوصل صاحبه السبب في ملف الحساب',
+          agree: 'تم الاتفاق ✓ — باقي خطوة: اضغط «رشّحه لحملة» عشان يدخل خط الإنتاج ويروح للاعتماد',
+          save2: 'انحفظ — سجّل كل محاولة تواصل أول بأول، هي اللي تطلع في تقييمك'
+        };
+        toast(IM[a] || 'انحفظ'); openInfl(i.id);
+      }
     });
     root.addEventListener('click', e => { const r = e.target.closest('[data-opendeal]'); if (r) openDeal(r.dataset.opendeal); });
   });
@@ -749,7 +787,7 @@ function openDeal(id) {
   const keys = platKeys(d); const I = infl(d.influencer_id);
   const stepper = `<div class="stepper">${STEPS.map((s, j) => `<div class="st ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}"><b></b><span>${s.n}</span></div>`).join('')}</div>`;
   const secWho = j => STEPS[j].k === 'appr' ? apprFor(d.member_id) : STEPS[j].k === 'video' ? 'صانع المحتوى + ' + apprFor(d.member_id) : stepWho(STEPS[j]);
-  const sec = (j, body, meta) => `<details class="sec ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}" ${j === i ? 'open' : ''}><summary><span class="idx">${j + 1}</span><span class="ttl">${STEPS[j].n} <span class="muted small">· ${esc(secWho(j))}</span></span><span class="meta">${meta || ''}</span></summary><div class="body">${body}</div></details>`;
+  const sec = (j, body, meta) => `<details class="sec ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}" ${j === i ? 'open' : ''}><summary><span class="idx">${j + 1}</span><span class="ttl">${STEPS[j].n} <span class="muted small">· ${esc(secWho(j))}</span></span><span class="meta">${meta || ''}</span></summary><div class="body">${j === i ? `<div class="note small"><b>وش بعد؟</b> ${NEXT[STEPS[j].k]}</div>` : ''}${body}</div></details>`;
   const v = k => esc(d[k] ?? '');
   const link = intakeLink(d);
   const waIntake = waLink(d.phone || d.rcv_phone, `هلا ${d.name}، نورتنا 🌹 عبّ بياناتك للشحن والتحويل من هذا الرابط: ${link}`);
@@ -825,8 +863,8 @@ function openDeal(id) {
     };
     root.addEventListener('click', async e => {
       const b = e.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act; let ch;
-      if (a === 'reject' || a === 'needs_edit') { b.disabled = true; const r = await decideDeal(d, a); b.disabled = false; if (r) { toast('انحفظ القرار'); openDeal(d.id); } return; }
-      if (a.startsWith('lv_')) { b.disabled = true; if (await launchPlat(d, a.slice(3))) { toast('انسجّل التشغيل'); openDeal(d.id); } return; }
+      if (a === 'reject' || a === 'needs_edit') { b.disabled = true; const r = await decideDeal(d, a); b.disabled = false; if (r) { toast('انحفظ القرار — رجعت لصانع المحتوى مع السبب في «مهامي» حقته'); openDeal(d.id); } return; }
+      if (a.startsWith('lv_')) { b.disabled = true; if (await launchPlat(d, a.slice(3))) { toast('انسجّل التشغيل ✓ — الملف يكتمل بعد تشغيل كل المنصات'); openDeal(d.id); } return; }
       if (a === 'vfix') { const why = await reasonBox('وش المطلوب يتعدّل في المقطع؟', true); if (why == null) return; b.disabled = true; const r = await saveDeal(d.id, { draft_at: null, rounds: (d.rounds || 0) + 1, draft_feedback: why.trim() }); b.disabled = false; if (r) { toast('رجع لصانع المحتوى مع ملاحظتك'); openDeal(d.id); } return; }
       if (a.startsWith('dl_')) ch = dl(a.slice(3));
       else if (a.startsWith('code_')) { const p = a.slice(5); ch = p === 'sn' ? { sn_user: val('sn_user'), sn_code: val('sn_code') } : { [p + '_code']: val(p + '_code') }; }
@@ -834,7 +872,23 @@ function openDeal(id) {
       if (!ch) return;
       if (a === 'close' && !await confirmBox('تأكيد إغلاق الملف؟')) return;
       b.disabled = true; const r = await saveDeal(d.id, ch); b.disabled = false;
-      if (r) { toast('انحفظ'); openDeal(d.id); }
+      if (r) {
+        const AM = {
+          send: `انرسلت للاعتماد ✓ — بتظهر عند ${apprFor(d.member_id)} في «مهامي»، وأول ما يقرر يرجع لك الرد في «مهامي» حقتك`,
+          approve: 'انعتمدت ✓ — رجعت لصانع المحتوى في «مهامي»: يكمّل العنوان أو يرسل رابط البيانات للمؤثر',
+          backup: 'انحفظت كاحتياط — تلاقيها في «مهامي» تحت «احتياط» متى ما احتجتها',
+          addr: 'انحفظ العنوان — أول ما يكتمل (جوال + مدينة + حي) تنتقل تلقائياً لصقر في «جاهزة للشحن»',
+          shipped: 'انسجّل الشحن ✓ — تابعها في «في الطريق: سجّل الوصول»',
+          delivered: 'انسجّل الوصول ✓ — رجعت لصانع المحتوى في «مهامي»: «وصله المنتج، أرسل المقطع الخام»',
+          failed: 'انسجّل تعذّر التسليم — بتظهر للشحن وصانع المحتوى للمتابعة',
+          draft: `انرسل المقطع الخام ✓ — بيظهر عند ${apprFor(d.member_id)} في «مقاطع خام تنتظر اعتمادك»، وأول ما يعتمده تنفتح لك خانات النزول`,
+          vok: 'انعتمد المقطع ✓ — رجع لصانع المحتوى في «مهامي» عشان ينزّله ويسجّل الكود لكل منصة',
+          payok: 'اعتمدت الدفع ✓ — انتقلت لمتعب في «معتمدة للدفع»: ينزّل الكشف ويرسله للمالية',
+          paid: d.paid_at ? 'ترجّع عن تسجيل الدفع' : 'انسجّل الدفع ✓ — اكتمل الملف مالياً'
+        };
+        toast(AM[a] || (a.startsWith('dl_') ? 'انسجّل النزول ✓ — راحت للميديا باير للتشغيل، وتطلع لزياد في شيت التشغيل' : 'انحفظ'));
+        openDeal(d.id);
+      }
     });
   });
 }
