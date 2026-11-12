@@ -65,7 +65,14 @@ function normPhone(s) {
   if (/^\+\d{8,15}$/.test(t)) return t;
   return null;
 }
-const handleOf = s => { s = String(s || '').trim(); const m = s.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i); return (m ? m[1] : s.replace(/^@/, '')).replace(/[/?].*$/, '').toLowerCase(); };
+const handleOf = s => {
+  s = String(s || '').trim();
+  const m = s.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i) || s.match(/instagram\.com\/(?!p\/|reel\/|reels\/|stories\/|explore\/)([A-Za-z0-9._]+)/i) || s.match(/snapchat\.com\/(?:add|@)\/?@?([A-Za-z0-9._-]+)/i);
+  if (m) return m[1].toLowerCase();
+  if (/^https?:/i.test(s) || /[\/\s:?]/.test(s) || /\.(com|net|org|me|co)$/i.test(s)) return '';   // رابط مختصر أو رابط ما فيه يوزر
+  return s.replace(/^@/, '').toLowerCase();
+};
+const shortLink = u => /vt\.tiktok\.com|vm\.tiktok\.com|tiktok\.com\/t\//i.test(String(u || ''));
 const isUrl = s => !s || /^https?:\/\/\S+\.\S+/.test(s);
 const CONTACT = 'ولو تكررت، تواصل مع عبدالمحسن.';
 function friendly(err) {
@@ -314,6 +321,7 @@ function openAcqNew() {
       const name = $('q_name').value.trim(), url = $('q_url').value.trim(), handle = handleOf($('q_handle').value || url), type = $('q_type').value;
       if (!name || !url || !type) return toast('عبّ الاسم ونوع الحساب ورابط تيك توك', true);
       if (!isUrl(url)) return toast('رابط الحساب مو صحيح', true);
+      if (!handle) return toast('اكتب يوزر الحساب في خانة «يوزر تيك توك». الرابط المختصر ما ينقرأ منه اليوزر، واليوزر هو اللي نعرف به الحساب', true);
       const dup = dupInfl(handle, url); if (dup.length && !await confirmBox('الحساب هذا موجود عندنا. تبي تسجّله مرة ثانية؟ الأفضل تفتح ملفه الموجود.')) return;
       if (!dup.length) { const t = await takenBy(handle); if (t) return toast(takenMsg(t), true); }
       root.querySelectorAll('button').forEach(b => b.disabled = true);
@@ -532,12 +540,13 @@ function openCampNom(cid, preInfl) {
     let busy = false;
     const saveAll = async send => {
       if (busy) return; busy = true; root.querySelectorAll('#cn_draft,#cn_send').forEach(b => b.disabled = true);
-      const batch = crypto.randomUUID(); let saved = 0, sent = 0, bad = 0; const taken = [];
+      const batch = crypto.randomUUID(); let saved = 0, sent = 0, bad = 0; const taken = [], why = [];
       for (const el of cardEls()) {
         if (isEmpty(el)) continue; const done = isDone(el);
         const keys = readPlats(el, 'c' + el.dataset.card); const rawPhone = f(el, 'phone'); const phone = normPhone(rawPhone);
-        if (rawPhone && phone === null) { bad++; el.classList.add('part'); continue; }
-        const url = f(el, 'url'); if (!isUrl(url)) { bad++; continue; }
+        if (rawPhone && phone === null) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: رقم الجوال مو صحيح (السعودي يبدأ بـ 05، والدولي بـ + ومفتاح الدولة)`); continue; }
+        const url = f(el, 'url'); if (!isUrl(url)) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: رابط الحساب مو صحيح (لازم يبدأ بـ https)`); continue; }
+        if (shortLink(url)) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: الرابط المختصر ما ينقرأ منه اليوزر. افتح الحساب وانسخ رابطه الكامل (tiktok.com/@اليوزر)`); continue; }
         // ملف المؤثر: نستخدم الموجود أو ننشئ جديد
         let iid = el.dataset.infl; const handle = handleOf(url);
         if (!iid) { const dup = dupInfl(handle, url, phone); if (dup.length) iid = dup[0].id; }
@@ -553,7 +562,7 @@ function openCampNom(cid, preInfl) {
       }
       busy = false; root.querySelectorAll('#cn_draft,#cn_send').forEach(b => b.disabled = false);
       if (taken.length) toast(taken.join(' '), true);
-      else if (bad) toast(`${bad} ترشيح فيه خطأ في الرابط أو الجوال، صححه وأعد المحاولة`, true);
+      else if (bad) toast(why.length ? why.join(' · ') : `${bad} ترشيح ما انحفظ. حدّث الصفحة وجرّب مرة ثانية`, true);
       else toast(send ? `انرسل ${sent} ترشيح للاعتماد عند ${apprFor(S.me.id)}${saved > sent ? '، و' + (saved - sent) + ' انحفظت مسودة لأنها ناقصة' : ''}` : `انحفظ ${saved} كمسودة`);
       if (!bad && !taken.length) { if (send && sent) closeModal(); else openCampNom(cid); }
     };

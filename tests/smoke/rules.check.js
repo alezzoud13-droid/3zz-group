@@ -54,6 +54,16 @@ let pass = 0, fail = 0; const ok = (c, n) => { c ? pass++ : fail++; console.log(
   const ex = await p.evaluate(() => window.__exports[0] || null);
   ok(!!ex && Object.values(ex.rows)[0] === 2, `كشف الدفع: نزل المحدد فقط (صف واحد + الإجمالي) من ${nGo} معتمد → ` + JSON.stringify(ex && ex.rows));
   await p.context().close();
+
+  /* ---- خطأ «مسجّل عند فلان» مع أي رابط (12 نوفمبر): الرابط المختصر ما يطابق أي حساب، وما ينحفظ يوزر «https:» ---- */
+  p = await open('creator', '#acq'); await p.click('#acqNew'); await p.waitForTimeout(300);
+  await p.fill('#q_name', 'حساب تجربة'); await p.selectOption('#q_type', { index: 1 }); await p.fill('#q_url', 'https://vt.tiktok.com/ZSabc123/'); await p.dispatchEvent('#q_url', 'change'); await p.waitForTimeout(400);
+  ok(await p.$eval('#q_dup', e => e.innerText.trim()) === '' && await p.$eval('#q_handle', e => e.value) === '', 'رابط مختصر في الاستقطاب: ما تطلع رسالة «مسجّل عند…» وما ينعبّى يوزر غلط');
+  await reset(p); await p.evaluate(() => { window.__writes.length = 0; }); await p.click('#q_send'); await p.waitForTimeout(400);
+  ok(await p.evaluate(() => window.__writes.filter(w => w.table === 'influencers').length) === 0 && /يوزر/.test(await toast(p)), 'الاستقطاب بدون يوزر: ما ينحفظ ويطلب اليوزر');
+  await p.fill('#q_url', 'https://www.tiktok.com/@new.account_9?lang=ar'); await p.dispatchEvent('#q_url', 'change'); await p.waitForTimeout(300);
+  ok(await p.$eval('#q_handle', e => e.value) === 'new.account_9', 'رابط الحساب الكامل: اليوزر ينقرأ صح');
+  await p.context().close();
   ok(errs.length === 0, 'لا أخطاء JavaScript' + (errs.length ? ': ' + errs[0] : ''));
   console.log(`\n${pass} ناجح، ${fail} فاشل`); await b.close(); process.exit(fail ? 1 : 0);
 })();
