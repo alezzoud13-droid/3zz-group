@@ -6,7 +6,7 @@
 <title>أداء فريق العز</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20261105a">
+<link rel="stylesheet" href="assets/style.css?v=20261112a">
 </head>
 <body>
 
@@ -117,6 +117,10 @@
       <div class="row"><div class="field"><label for="dPeriod">الفترة</label><select id="dPeriod"><option value="month">هذا الشهر</option><option value="last">الشهر الماضي</option><option value="30">آخر 30 يوم</option><option value="all">الكل</option></select></div>
       <button class="btn primary" id="dXlsx" type="button" style="align-self:end">تنزيل Excel</button></div></div></div>
     <div class="tiles" id="dTiles"></div>
+    <div class="panel"><h3>معوّقات كتبها الفريق وتحتاج تدخّل <span class="pill bad" id="dBlockN"></span></h3><div class="tw" id="dBlock"></div>
+      <h3>الالتزام بتقرير اليوم</h3><div class="tw" id="dDaily"></div>
+      <div class="note">«الالتزام» = أيام العمل اللي انكتب فيها تقرير ÷ أيام العمل في الفترة (الأحد إلى الخميس، لين أمس، ومن تاريخ انضمام الشخص). «إنجاز القائمة اليومية» = المهام اللي أشّر عليها ÷ مهام قائمته في التقارير اللي كتبها. الأقل التزاماً يطلع أول.</div>
+      <details><summary class="small" style="cursor:pointer;color:var(--accent)">شغل سوّوه خارج النظام (من خانة «وش سويت غير المسجّل؟»)</summary><div class="tw" id="dNotes" style="margin-top:10px"></div></details></div>
     <div class="panel"><h3>المراحل: وين يتأخر الشغل؟</h3><div class="tw" id="dSteps"></div>
       <div class="note">«مفتوح» = ملفات واقفة عند المرحلة الحين. «متأخر» = تجاوز المدة المسموحة. «وسيط الأيام» = نصف الملفات خلصت المرحلة خلال هذي المدة أو أقل. أعلى وسيط هو عنق الزجاجة.</div></div>
     <div class="panel"><h3>الاستقطاب حسب الموظف</h3><div class="tw" id="dAcq"></div>
@@ -144,7 +148,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="assets/config.js?v=20261105a"></script>
-<script src="assets/app.js?v=20261105a"></script>
+<script src="assets/config.js?v=20261112a"></script>
+<script src="assets/app.js?v=20261112a"></script>
 </body>
 </html>

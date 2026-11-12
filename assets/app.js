@@ -933,7 +933,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) poll
 $('tDate').value = today(); $('tDate').addEventListener('change', renderToday);
 async function renderToday() {
   const day = $('tDate').value || today(), me = S.me.id;
-  const on = t => t && t.slice(0, 10) === day;
+  const on = t => t && dtX(t).slice(0, 10) === day;   // اليوم بتوقيت الرياض، مو UTC
   const acts = [];
   for (const i of S.infl) { if (i.nominated_by === me && on(i.created_at) && i.source === 'acq') acts.push('سجّل استقطاب ' + i.name); if (i.nominated_by === me && on(i.agreed_at)) acts.push('اتفق مع ' + i.name); if (i.acq_decided_by === me && on(i.acq_decided_at)) acts.push('قرّر في استقطاب ' + i.name); }
   for (const d of S.deals) {
@@ -984,6 +984,36 @@ function renderDash() {
   $('dCreators').innerHTML = `<table><thead><tr><th>الصانع</th><th class="num">رشّح للحملات</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">نسبة القبول</th><th class="num">وصلهم</th><th class="num">نزل كامل</th><th class="num">الإنجاز</th><th class="num">أيام للنشر</th><th class="num">متأخر عنده</th><th class="num">مبالغ المعتمد</th></tr></thead><tbody>${cr.map(x => `<tr><td>${esc(x.m.name)}</td><td class="num">${x.sent}</td><td class="num">${x.ok}</td><td class="num">${x.rej || ''}</td><td class="num">${pl(x.acc)}</td><td class="num">${x.del}</td><td class="num">${x.posted}</td><td class="num">${pl(x.rate)}</td><td class="num">${x.md == null ? '—' : fmt(x.md)}</td><td class="num">${x.late || ''}</td><td class="num">${fmt(x.spend)}</td></tr>`).join('')}</tbody></table>`;
   const byTo = {}; for (const r of S.reqs) { if (!r.to_member || r.kind === 'quota') continue; const o = byTo[r.to_member] = byTo[r.to_member] || { n: 0, done: 0, ontime: 0, due: 0, rounds: [], open: 0, late: 0 }; if (inP(r.created_at)) o.n++; if (inP(r.done_at)) { o.done++; o.rounds.push(r.rounds || 0); if (r.due) { o.due++; if (r.done_at.slice(0, 10) <= r.due) o.ontime++; } } if (!['done', 'cancelled'].includes(r.status)) { o.open++; if (r.due && r.due < today()) o.late++; } }
   $('dReqs').innerHTML = `<table><thead><tr><th>المسؤول</th><th class="num">طلبات جديدة</th><th class="num">سلّمها</th><th class="num">في الموعد</th><th class="num">متوسط جولات التعديل</th><th class="num">مفتوحة</th><th class="num">متأخرة</th></tr></thead><tbody>${Object.entries(byTo).map(([id, o]) => `<tr><td>${esc(memName(id))}</td><td class="num">${o.n}</td><td class="num">${o.done}</td><td class="num">${pl(pct(o.ontime, o.due))}</td><td class="num">${o.rounds.length ? fmt(o.rounds.reduce((s, x) => s + x, 0) / o.rounds.length) : '—'}</td><td class="num">${o.open}</td><td class="num">${o.late || ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">ما فيه طلبات للحين.</td></tr>'}</tbody></table>`;
+  renderDaily(a, b);
+}
+
+/* ================= تقارير اليوم والمعوّقات (للأدمن) ================= */
+/* أيام العمل: الأحد إلى الخميس. نحسب لين أمس، لأن تقرير اليوم ينكتب آخر الدوام. */
+const isWorkDay = d => d.getDay() !== 5 && d.getDay() !== 6;
+function workDaysBetween(from, to) { let n = 0; for (let d = new Date(from.getFullYear(), from.getMonth(), from.getDate()); d < to; d.setDate(d.getDate() + 1)) if (isWorkDay(d)) n++; return n; }
+const taskListOf = m => ((m && m.roles) || []).flatMap(r => (S.tasks[r] || []).map((t, i) => r + '_' + i));
+let dailyTok = 0;
+async function renderDaily(a, b) {
+  const box = $('dDaily'); if (!box || !isAdmin()) return; const tok = ++dailyTok;
+  const { data, error } = await sb.from('daily_reports').select('*').gte('day', ymd(a)).lt('day', ymd(b)).order('day', { ascending: false }).limit(5000);
+  if (tok !== dailyTok) return;
+  if (error) { box.innerHTML = `<div class="muted small" style="padding:12px">${esc(friendly(error))}</div>`; return; }
+  const R = data || []; const td = today(); const t0 = new Date(td + 'T00:00:00'); const end = new Date(Math.min(+b, +t0));
+  const firstDay = R.length ? new Date(R[R.length - 1].day + 'T00:00:00') : t0;
+  const rows = active().map(m => {
+    const L = R.filter(r => r.member_id === m.id); const joined = new Date(m.created_at || 0);
+    const from = new Date(Math.max(+a, +new Date(joined.getFullYear(), joined.getMonth(), joined.getDate()), a.getFullYear() < 2001 ? +firstDay : 0));
+    const due = from < end ? workDaysBetween(from, end) : 0;
+    const done = new Set(L.filter(r => r.day < td && r.day >= ymd(from)).map(r => r.day)).size;
+    const list = taskListOf(m); const checked = L.reduce((s, r) => s + list.filter(k => r.tasks && r.tasks[k]).length, 0);
+    return { m, n: L.length, due, done, rate: due ? Math.min(100, Math.round(done / due * 100)) : null, last: L[0] ? L[0].day : '', todayOk: L.some(r => r.day === td), taskRate: list.length && L.length ? Math.round(checked / (list.length * L.length) * 100) : null, blocks: L.filter(r => (r.blockers || '').trim()).length };
+  }).sort((x, y) => (x.rate ?? 101) - (y.rate ?? 101));
+  const pl = v => v == null ? '—' : `<span class="pill ${v >= 90 ? 'good' : v >= 70 ? 'warn' : 'bad'}">${v}٪</span>`;
+  box.innerHTML = `<table><thead><tr><th>الشخص</th><th>الدور</th><th class="num">تقارير بالفترة</th><th class="num">أيام العمل</th><th class="num">الالتزام</th><th>تقرير اليوم</th><th>آخر تقرير</th><th class="num">إنجاز القائمة اليومية</th><th class="num">معوّقات</th></tr></thead><tbody>${rows.map(x => `<tr><td>${esc(x.m.name)}</td><td class="small muted">${esc((x.m.roles || []).map(r => ROLES[r]).join(' + '))}</td><td class="num">${x.n}</td><td class="num">${x.due}</td><td class="num">${pl(x.rate)}</td><td>${x.todayOk ? '<span class="pill good">سلّم</span>' : '<span class="pill">ما سلّم للحين</span>'}</td><td class="small muted">${x.last ? dShort(x.last) : '—'}</td><td class="num">${pl(x.taskRate)}</td><td class="num">${x.blocks || ''}</td></tr>`).join('')}</tbody></table>`;
+  const B = R.filter(r => (r.blockers || '').trim()), N = R.filter(r => (r.note || '').trim());
+  $('dBlockN').textContent = B.length ? B.length : '';
+  $('dBlock').innerHTML = B.length ? `<table><thead><tr><th>التاريخ</th><th>الشخص</th><th>المعوّق</th></tr></thead><tbody>${B.slice(0, 60).map(r => `<tr><td class="small" style="white-space:nowrap">${dShort(r.day)}</td><td style="white-space:nowrap">${esc(memName(r.member_id))}</td><td style="white-space:normal;min-width:260px">${esc(r.blockers)}</td></tr>`).join('')}</tbody></table>` : '<div class="muted small" style="padding:12px">ما أحد كتب معوّقات في هذي الفترة.</div>';
+  $('dNotes').innerHTML = N.length ? `<table><thead><tr><th>التاريخ</th><th>الشخص</th><th>شغل غير مسجّل في النظام</th></tr></thead><tbody>${N.slice(0, 100).map(r => `<tr><td class="small" style="white-space:nowrap">${dShort(r.day)}</td><td style="white-space:nowrap">${esc(memName(r.member_id))}</td><td style="white-space:normal;min-width:260px">${esc(r.note)}</td></tr>`).join('')}</tbody></table>` : '<div class="muted small" style="padding:12px">ما فيه ملاحظات في هذي الفترة.</div>';
 }
 $('dXlsx').onclick = async () => {
   const dt = t => !t ? '' : String(t).length <= 10 ? String(t) : dtX(t);
@@ -994,7 +1024,10 @@ $('dXlsx').onclick = async () => {
   const wb = XLSX.utils.book_new(); const add = (rows, n) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, n); };
   add(camps, 'الحملات'); add(deals, 'ترشيحات الحملات'); add(infls, 'المؤثرين والاستقطاب'); const { data: EVS } = await sb.from('request_events').select('*').order('created_at').limit(20000);
   const evs = (EVS || []).map(e => { const r = S.reqs.find(x => x.id === e.request_id) || {}; return { 'التاريخ والوقت (الرياض)': dtX(e.created_at), 'الطلب': r.title || '', 'الشخص': memName(e.member_id), 'الحدث': EV[e.type] || e.type, 'التفاصيل': e.body }; });
-  add(reqs, 'الطلبات'); if (evs.length) add(evs, 'سجل الطلبات'); XLSX.writeFile(wb, `أداء فريق العز ${today()}.xlsx`);
+  add(reqs, 'الطلبات'); if (evs.length) add(evs, 'سجل الطلبات');
+  const { data: DR } = await sb.from('daily_reports').select('*').order('day', { ascending: false }).limit(20000);
+  const drs = (DR || []).map(r => { const list = taskListOf(mem(r.member_id)); return { 'التاريخ': r.day, 'الشخص': memName(r.member_id), 'مهام يومية منجزة': list.filter(k => r.tasks && r.tasks[k]).length, 'من أصل': list.length, 'شغل غير مسجّل': r.note, 'المعوّقات': r.blockers, 'آخر حفظ (الرياض)': dtX(r.updated_at) }; });
+  if (drs.length) add(drs, 'تقارير اليوم'); XLSX.writeFile(wb, `أداء فريق العز ${today()}.xlsx`);
 };
 
 /* ================= الإعدادات ================= */
