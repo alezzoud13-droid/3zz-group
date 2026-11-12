@@ -1,5 +1,5 @@
 {
-  "meta": {"harness":"1466ee6182e4","frozenNow":"2026-11-11T08:00:00.000Z","note":"recorded by smoke.js --update; the per-scenario writes/exports are the contract, render summaries are informational"},
+  "meta": {"harness":"22cb2470573e","frozenNow":"2026-11-11T08:00:00.000Z","note":"recorded by smoke.js --update; the per-scenario writes/exports are the contract, render summaries are informational"},
   "render": {
     "render:admin#mine": {"ids":{"mineAs":{"kids":10},"mineBody":{"kids":12,"button":25,"field":9}},"data":{"data-mf":3,"data-top":1,"data-open":9,"data-g":7,"data-openinfl":1,"data-more":3,"data-all":3,"data-dobulk":3,"data-bulk":6,"data-ap1":1,"data-dq":2,"data-id":2,"data-req":2,"data-payx":1},"groups":["members=0","acq_review=1","appr=1","quota_req=2","draft=1","pay=3","pay_go=2"],"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
     "render:admin#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1,"tr":43,"table":1}},"data":{"data-openinfl":42},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
@@ -243,20 +243,20 @@
     "creator_campaign_nomination_draft_then_send": {
       "writes": [
         {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_new_nominee","p_phone":""}},
-        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","campaign_id":"@camp.beta","city":"","country":"السعودية","handle":"smoke_infl_01","hook":"","influencer_id":"@infl.of_draft","name":"مؤثر تجريبي 01","phone":"","planned_date":null,"platform":"تيك توك","price":500,"rcv_city":"","rcv_name":"مؤثر تجريبي 01","rcv_phone":"","sn_user":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","campaign_id":"@camp.beta","city":"","country":"السعودية","handle":"smoke_infl_01","hook":"","influencer_id":"@infl.of_draft","name":"مؤثر تجريبي 01","phone":"","planned_date":null,"platform":"تيك توك","price":500,"price_before":1200,"rcv_city":"","rcv_name":"مؤثر تجريبي 01","rcv_phone":"","sn_user":""}},
         {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_new_nominee","p_phone":"+966557776655"}},
         {"table":"influencers","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","account_status":"استقطاب","acq_status":"none","city":"الرياض","country":"","district":"حي الترشيح – RRRD7777","handle":"smoke_new_nominee","ig_user":"","name":"مرشح جديد","name_en":"","nominated_by":"@member.creator","phone":"+966557776655","platforms":"تيك توك + سناب شات","snap_user":"smoke_nominee_snap","source":"campaign","tiktok_url":"https://www.tiktok.com/@smoke_new_nominee"}},
-        {"table":"deals","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"حي الترشيح – RRRD7777","campaign_id":"@camp.beta","city":"الرياض","country":"","handle":"smoke_new_nominee","hook":"هوك الترشيح","influencer_id":"<uuid>","member_id":"@member.creator","name":"مرشح جديد","phone":"+966557776655","planned_date":"2030-02-01","platform":"تيك توك + سناب شات","price":750,"rcv_city":"الرياض","rcv_name":"مرشح جديد","rcv_phone":"+966557776655","sn_user":"smoke_nominee_snap"}},
-        {"table":"deals","op":"update","match":{"id":"<uuid>"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"حي الترشيح – RRRD7777","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.beta","city":"الرياض","country":"","decision_reason":"","handle":"smoke_new_nominee","hook":"هوك الترشيح","influencer_id":"<uuid>","name":"مرشح جديد","phone":"+966557776655","planned_date":"2030-02-01","platform":"تيك توك + سناب شات","price":750,"rcv_city":"الرياض","rcv_name":"مرشح جديد","rcv_phone":"+966557776655","sent_at":"<ts>","sn_user":"smoke_nominee_snap"}},
-        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.beta","city":"","country":"السعودية","decision_reason":"","handle":"smoke_infl_01","hook":"","influencer_id":"@infl.of_draft","name":"مؤثر تجريبي 01","phone":"","planned_date":null,"platform":"تيك توك","price":500,"rcv_city":"","rcv_name":"مؤثر تجريبي 01","rcv_phone":"","sent_at":"<ts>","sn_user":""}}
+        {"table":"deals","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"حي الترشيح – RRRD7777","campaign_id":"@camp.beta","city":"الرياض","country":"","handle":"smoke_new_nominee","hook":"هوك الترشيح","influencer_id":"<uuid>","member_id":"@member.creator","name":"مرشح جديد","phone":"+966557776655","planned_date":"2030-02-01","platform":"تيك توك + سناب شات","price":750,"price_before":900,"rcv_city":"الرياض","rcv_name":"مرشح جديد","rcv_phone":"+966557776655","sn_user":"smoke_nominee_snap"}},
+        {"table":"deals","op":"update","match":{"id":"<uuid>"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"حي الترشيح – RRRD7777","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.beta","city":"الرياض","country":"","decision_reason":"","handle":"smoke_new_nominee","hook":"هوك الترشيح","influencer_id":"<uuid>","name":"مرشح جديد","phone":"+966557776655","planned_date":"2030-02-01","platform":"تيك توك + سناب شات","price":750,"price_before":900,"rcv_city":"الرياض","rcv_name":"مرشح جديد","rcv_phone":"+966557776655","sent_at":"<ts>","sn_user":"smoke_nominee_snap"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.beta","city":"","country":"السعودية","decision_reason":"","handle":"smoke_infl_01","hook":"","influencer_id":"@infl.of_draft","name":"مؤثر تجريبي 01","phone":"","planned_date":null,"platform":"تيك توك","price":500,"price_before":1200,"rcv_city":"","rcv_name":"مؤثر تجريبي 01","rcv_phone":"","sent_at":"<ts>","sn_user":""}}
       ],
       "exports": [
       ]
     },
     "creator_nominate_agreed_influencer_to_campaign": {
       "writes": [
-        {"table":"deals","op":"update","match":{"id":"@deal.needs_edit"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.alpha","city":"","country":"السعودية","decision_reason":"","handle":"smoke_infl_07","hook":"","influencer_id":"@infl.of_needs_edit","name":"مؤثر تجريبي 07","phone":"","planned_date":null,"platform":"تيك توك","price":1000,"rcv_city":"","rcv_name":"مؤثر تجريبي 07","rcv_phone":"","sent_at":"<ts>","sn_user":""}},
-        {"table":"deals","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","ad_type":"","address":"حي تجريبي – JJJD1090","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.alpha","city":"جدة","country":"السعودية","decision_reason":"","handle":"smoke_infl_41","hook":"","influencer_id":"@infl.acq_agreed","member_id":"@member.creator","name":"مؤثر تجريبي 41","phone":"+966500000090","planned_date":null,"platform":"تيك توك + سناب شات","price":2200,"rcv_city":"جدة","rcv_name":"مؤثر تجريبي 41","rcv_phone":"+966500000090","sent_at":"<ts>","sn_user":"smoke_agreed"}}
+        {"table":"deals","op":"update","match":{"id":"@deal.needs_edit"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.alpha","city":"","country":"السعودية","decision_reason":"","handle":"smoke_infl_07","hook":"","influencer_id":"@infl.of_needs_edit","name":"مؤثر تجريبي 07","phone":"","planned_date":null,"platform":"تيك توك","price":1000,"price_before":1200,"rcv_city":"","rcv_name":"مؤثر تجريبي 07","rcv_phone":"","sent_at":"<ts>","sn_user":""}},
+        {"table":"deals","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","ad_type":"","address":"حي تجريبي – JJJD1090","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.alpha","city":"جدة","country":"السعودية","decision_reason":"","handle":"smoke_infl_41","hook":"","influencer_id":"@infl.acq_agreed","member_id":"@member.creator","name":"مؤثر تجريبي 41","phone":"+966500000090","planned_date":null,"platform":"تيك توك + سناب شات","price":2200,"price_before":3000,"rcv_city":"جدة","rcv_name":"مؤثر تجريبي 41","rcv_phone":"+966500000090","sent_at":"<ts>","sn_user":"smoke_agreed"}}
       ],
       "exports": [
       ]
@@ -270,15 +270,15 @@
     },
     "creator_deal_draft_save_then_send": {
       "writes": [
-        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","hook":"هوك جديد","name":"مؤثر تجريبي 01","notes":"ملاحظة على الترشيح","planned_date":null,"platform":"تيك توك","price":500}},
-        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","approval":"pending","decision_reason":"","hook":"هوك جديد","name":"مؤثر تجريبي 01","notes":"ملاحظة على الترشيح","planned_date":null,"platform":"تيك توك","price":500,"sent_at":"<ts>"}}
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","hook":"هوك جديد","name":"مؤثر تجريبي 01","notes":"ملاحظة على الترشيح","planned_date":null,"platform":"تيك توك","price":500,"price_before":1200}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","approval":"pending","decision_reason":"","hook":"هوك جديد","name":"مؤثر تجريبي 01","notes":"ملاحظة على الترشيح","planned_date":null,"platform":"تيك توك","price":500,"price_before":1200,"sent_at":"<ts>"}}
       ],
       "exports": [
       ]
     },
     "creator_deal_fix_and_resend": {
       "writes": [
-        {"table":"deals","op":"update","match":{"id":"@deal.needs_edit"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","approval":"pending","decision_reason":"","hook":"","name":"مؤثر تجريبي 07","notes":"","planned_date":null,"platform":"تيك توك","price":900,"sent_at":"<ts>"}}
+        {"table":"deals","op":"update","match":{"id":"@deal.needs_edit"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","approval":"pending","decision_reason":"","hook":"","name":"مؤثر تجريبي 07","notes":"","planned_date":null,"platform":"تيك توك","price":900,"price_before":1200,"sent_at":"<ts>"}}
       ],
       "exports": [
       ]

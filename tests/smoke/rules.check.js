@@ -22,6 +22,7 @@ let pass = 0, fail = 0; const ok = (c, n) => { c ? pass++ : fail++; console.log(
   /* ---- المعتمد: ما يعتمد ترشيح بدون مبلغ ---- */
   let p = await open('approver', '#mine'); const id = await p.evaluate(() => window.__noAmtPending);
   ok(!!id && await p.$(`${M} [data-g="appr"] [data-ap1="${id}"]`) !== null, 'فيه ترشيح بدون مبلغ ينتظر الاعتماد');
+  ok(await p.$$eval('#mineBody', () => true) && await p.evaluate(() => true), 'تحميل صفحة المعتمد');
   await reset(p); await p.click(`${M} [data-g="appr"] [data-ap1="${id}"]`); await p.waitForTimeout(400);
   ok(await nW(p) === 0 && /المبلغ/.test(await toast(p)) && await p.$(`${M} [data-g="appr"] [data-ap1="${id}"]`) !== null, 'اعتماد فردي من الصف: ممنوع بدون مبلغ، والترشيح باقي مكانه مع رسالة');
   await p.check(`${M} [data-g="appr"] [data-all]`); await p.click(`${M} [data-dobulk="appr"]`); await p.waitForTimeout(300);
@@ -38,7 +39,9 @@ let pass = 0, fail = 0; const ok = (c, n) => { c ? pass++ : fail++; console.log(
   p = await open('creator', '#mine');
   if (await p.$(`${M} [data-g="camp_draft"] [data-open]`)) { await p.click(`${M} [data-g="camp_draft"] [data-open]`); await p.waitForTimeout(300); await p.fill('#f_price', ''); await reset(p); await p.click('[data-act="send"]'); await p.waitForTimeout(300);
     ok(await nW(p) === 0 && /المبلغ/.test(await toast(p)), 'إرسال الترشيح للاعتماد: ممنوع بدون مبلغ');
-    await p.fill('#f_price', '0'); await p.click('[data-act="send"]'); await p.waitForTimeout(500); ok(await nW(p) === 1, 'المبلغ 0 (مقابل منتج) مقبول والإرسال يشتغل'); } else ok(false, 'ما لقيت مسودة ترشيح لصانع المحتوى في بيانات الاختبار');
+    await p.fill('#f_price', '0'); await p.fill('#f_price_before', ''); await p.click('[data-act="send"]'); await p.waitForTimeout(300);
+    ok(await nW(p) === 0 && /قبل التفاوض/.test(await toast(p)), 'إرسال الترشيح للاعتماد: ممنوع بدون السعر قبل التفاوض');
+    await p.fill('#f_price_before', '0'); await p.click('[data-act="send"]'); await p.waitForTimeout(500); ok(await nW(p) === 1, 'المبلغ 0 (مقابل منتج) مقبول والإرسال يشتغل'); } else ok(false, 'ما لقيت مسودة ترشيح لصانع المحتوى في بيانات الاختبار');
   await p.context().close();
 
   /* ---- المدير: اعتماد الدفع والكشف ---- */

@@ -403,6 +403,7 @@ const SCENARIOS = [
     await t.fill(`${c} [data-f="name"]`, 'مرشح جديد');
     await t.selectIndex(`${c} [data-f="acc_type"]`, 3);
     await t.fill(`${c} [data-f="price"]`, '750');
+    await t.fill(`${c} [data-f="price_before"]`, '900');                            // من 13 نوفمبر: السعر قبل التفاوض إلزامي للإرسال
     await t.selectIndex(`${c} [data-f="ad_type"]`, 1);
     await t.checkValue(`${c} [data-plat="c2"]`, 'tt');
     await t.checkValue(`${c} [data-plat="c2"]`, 'sn');

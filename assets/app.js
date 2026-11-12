@@ -30,10 +30,11 @@ const PLATS = [{ k: 'tt', n: 'تيك توك' }, { k: 'sn', n: 'سناب شات' 
 const PL = { tt: 'تيك توك', sn: 'سناب شات', ig: 'انستقرام' };
 const CONTACT_CH = ['تيك توك', 'سناب شات', 'انستقرام', 'يوتيوب', 'البريد الإلكتروني', 'واتساب', 'اتصال'];
 const CONTACT_RES = ['تم التواصل', 'ما رد', 'رد وجاري التفاوض', 'ما اتفقنا بسبب السعر', 'رفض التعاون', 'تم الاتفاق'];
-const AD_TYPES = ['منزلي', 'خارجي', 'حضوري'];
+const AD_TYPES = ['منزلي', 'حضوري'];
+const adT = v => v === 'خارجي' ? 'حضوري' : (v || '');   // «خارجي» القديمة تنقرأ «حضوري»
 const SHIP_COS = ['سمسا', 'أرامكس', 'سبل', 'ناقل', 'ريدبوكس', 'جي تي', 'DHL', 'مندوب'];
 const ACQ = { draft: ['مسودة', ''], pending: ['بانتظار المراجعة', 'acc'], needs_edit: ['يحتاج تعديل', 'warn'], approved: ['معتمد: تواصل وفاوض', 'good'], rejected: ['مرفوض', 'bad'], none: ['من الحملات', ''] };
-const REQ_KINDS = { design: 'تصميم', ship: 'شحن', ad: 'إطلاق إعلان', snap: 'سناب', social: 'سوشيال ميديا', quota: 'زيادة حصة ترشيح', other: 'أخرى' };
+const REQ_KINDS = { design: 'تصميم', ship: 'شحن', ad: 'إطلاق إعلان', snap: 'سناب', social: 'سوشيال ميديا', quota: 'زيادة حصة ترشيح', edit: 'تعديل بيانات بعد الاعتماد', other: 'أخرى' };
 const REQ_STATUS = { new: ['جديد', 'acc'], doing: ['قيد التنفيذ', 'warn'], review: ['بانتظار المراجعة', 'acc'], fix: ['يحتاج تعديل', 'bad'], done: ['منتهي', 'good'], cancelled: ['ملغي', ''] };
 const CAMP_ST = { active: ['شغالة', 'good'], paused: ['متوقفة', 'warn'], ended: ['منتهية', ''] };
 
@@ -344,7 +345,8 @@ function contactRow(c, i) {
 function openInfl(id) {
   const i = infl(id); if (!i) return;
   const me = S.me.id, owner = i.nominated_by === me || isAdmin(), appr = isApprover() && (i.nominated_by !== me || isAdmin());
-  const st = i.acq_status, editable1 = owner && ['draft', 'needs_edit'].includes(st) || isAdmin();
+  const st = i.acq_status, editable1 = owner && ['draft', 'needs_edit'].includes(st) || isAdmin() || (appr && st === 'approved');
+  const priceLock = i.agreed_at && !(isAdmin() || appr) ? 'disabled' : '';
   const open2 = st === 'approved' || st === 'none';
   const keys = platKeys(i); const D = S.deals.filter(d => d.influencer_id === i.id);
   const contacts = Array.isArray(i.contacts) ? i.contacts.slice() : [];
@@ -397,8 +399,8 @@ function openInfl(id) {
     </div>
     <h3>التفاوض</h3>
     <div class="grid3">
-     <div class="field"><label for="i_price_before">السعر قبل التفاوض</label><input type="number" min="0" step="0.01" id="i_price_before" value="${v('price_before')}"></div>
-     <div class="field"><label for="i_price_after">السعر بعد التفاوض</label><input type="number" min="0" step="0.01" id="i_price_after" value="${v('price_after')}"></div>
+     <div class="field"><label for="i_price_before">السعر قبل التفاوض</label><input type="number" min="0" step="0.01" id="i_price_before" value="${v('price_before')}" ${priceLock}></div>
+     <div class="field"><label for="i_price_after">السعر بعد التفاوض</label><input type="number" min="0" step="0.01" id="i_price_after" value="${v('price_after')}" ${priceLock}></div>
      <div class="field"><label for="i_currency">العملة</label><select id="i_currency">${opts(['SAR', 'AED', 'KWD', 'USD'], i.currency || 'SAR')}</select></div>
     </div>
     <div class="muted small" id="i_diff">${diff != null ? `وفّرنا ${fmt(diff)} ${esc(i.currency || 'SAR')} (${pct(diff, i.price_before)}٪)` : ''}</div>
@@ -486,8 +488,9 @@ function nomCard(n, d, pre) {
     <div class="field"><label>رابط حساب تيك توك *</label><input type="url" data-f="url" dir="ltr" value="${val('_url', 'tiktok_url')}" placeholder="https://www.tiktok.com/@..."></div>
     <div class="field"><label>اسم المعلن *</label><input type="text" data-f="name" value="${val('name')}"></div>
     <div class="field"><label>نوع المحتوى *</label><select data-f="acc_type">${optsBlank(ACC_TYPES, src.acc_type || (i && i.acc_type))}</select></div>
-    <div class="field"><label>المبلغ *</label><input type="number" min="0" data-f="price" value="${val('price', 'price_after')}" placeholder="0 = مقابل منتج"></div>
-    <div class="field"><label>نوع الإعلان</label><select data-f="ad_type">${optsBlank(AD_TYPES, src.ad_type)}</select></div>
+    <div class="field"><label>السعر قبل التفاوض *</label><input type="number" min="0" data-f="price_before" value="${val('price_before')}" placeholder="السعر اللي طلبه أول"></div>
+    <div class="field"><label>المبلغ بعد التفاوض *</label><input type="number" min="0" data-f="price" value="${val('price', 'price_after')}" placeholder="0 = مقابل منتج"></div>
+    <div class="field"><label>نوع الإعلان</label><select data-f="ad_type">${optsBlank(AD_TYPES, adT(src.ad_type))}</select></div>
     <div class="field"><label>حالة الحساب</label><select data-f="status">${opts(['استقطاب', 'مستمر'], isContinuing(i) ? 'مستمر' : (i && i.account_status) || 'استقطاب')}</select></div>
    </div>
    <div class="field"><label>منصة التنزيل *</label>${platChecks('c' + n, keys)}</div>
@@ -530,10 +533,10 @@ function openCampNom(cid, preInfl) {
     const cardEls = () => [...root.querySelectorAll('[data-card]')];
     const f = (el, k) => { const x = el.querySelector(`[data-f="${k}"]`); return x ? x.value.trim() : ''; };
     const isEmpty = el => !f(el, 'url') && !f(el, 'name');
-    const isDone = el => f(el, 'url') && f(el, 'name') && f(el, 'acc_type') && f(el, 'price') !== '' && readPlats(el, 'c' + el.dataset.card).length;
+    const isDone = el => f(el, 'url') && f(el, 'name') && f(el, 'acc_type') && f(el, 'price') !== '' && f(el, 'price_before') !== '' && readPlats(el, 'c' + el.dataset.card).length;
     const count = () => { let ok = 0; cardEls().forEach(el => { const d = isDone(el); el.classList.toggle('ok', !!d); el.classList.toggle('part', !d && !isEmpty(el)); el.querySelector('[data-cst]').textContent = d ? 'مكتمل' : isEmpty(el) ? 'فاضي' : 'ناقص'; if (d) ok++; }); $('cn_count').textContent = `مكتمل ${ok} من ${cardEls().length}`; };
     root.addEventListener('input', count); root.addEventListener('change', e => { const p = e.target.closest('[data-plat]'); if (p) { const el = p.closest('[data-card]'); const k = readPlats(el, 'c' + el.dataset.card); el.querySelectorAll('[data-for]').forEach(x => x.hidden = !k.includes(x.dataset.for)); } count(); });
-    root.querySelectorAll('[data-f=url]').forEach(inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const dup = dupInfl(handleOf(inp.value), inp.value); if (dup.length && !el.dataset.infl) { const i = dup[0]; el.dataset.infl = i.id; const set = (k, v) => { const x = el.querySelector(`[data-f="${k}"]`); if (x && !x.value && v) x.value = v; }; set('name', i.name); set('acc_type', i.acc_type); set('phone', i.phone); set('city', i.city); set('district', i.district); set('country', i.country); set('sn_user', i.snap_user); set('ig_user', i.ig_user); set('name_en', i.name_en); if (i.price_after != null) set('price', String(i.price_after)); if (isContinuing(i)) el.querySelector('[data-f=status]').value = 'مستمر'; toast('الحساب موجود عندنا، سحبت بياناته'); count(); } else if (!dup.length) takenBy(handleOf(inp.value)).then(t => { let w = el.querySelector('[data-taken]'); if (!w) { w = document.createElement('div'); w.dataset.taken = '1'; w.className = 'dup'; el.querySelector('.hd').after(w); } w.hidden = !t; w.textContent = t ? takenMsg(t) : ''; }); }));
+    root.querySelectorAll('[data-f=url]').forEach(inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const dup = dupInfl(handleOf(inp.value), inp.value); if (dup.length && !el.dataset.infl) { const i = dup[0]; el.dataset.infl = i.id; const set = (k, v) => { const x = el.querySelector(`[data-f="${k}"]`); if (x && !x.value && v) x.value = v; }; set('name', i.name); set('acc_type', i.acc_type); set('phone', i.phone); set('city', i.city); set('district', i.district); set('country', i.country); set('sn_user', i.snap_user); set('ig_user', i.ig_user); set('name_en', i.name_en); if (i.price_after != null) set('price', String(i.price_after)); if (i.price_before != null) set('price_before', String(i.price_before)); if (isContinuing(i)) el.querySelector('[data-f=status]').value = 'مستمر'; toast('الحساب موجود عندنا، سحبت بياناته'); count(); } else if (!dup.length) takenBy(handleOf(inp.value)).then(t => { let w = el.querySelector('[data-taken]'); if (!w) { w = document.createElement('div'); w.dataset.taken = '1'; w.className = 'dup'; el.querySelector('.hd').after(w); } w.hidden = !t; w.textContent = t ? takenMsg(t) : ''; }); }));
     root.addEventListener('click', async e => { const rm = e.target.closest('[data-rm]'); if (!rm) return; const el = rm.closest('[data-card]'); if (!await confirmBox('تحذف هذا الترشيح؟')) return; const r = await q(sb.from('deals').update({ closed_at: nowIso(), closed_reason: 'حذفه الموظف قبل الإرسال' }).eq('id', el.dataset.deal).select().single()); if (r) { upsertLocal(S.deals, r); openCampNom(cid); } });
     count();
     $('cn_more').onclick = () => requestQuota(cid);
@@ -555,7 +558,7 @@ function openCampNom(cid, preInfl) {
         if (iid) { const cur = infl(iid); const fillEmpty = {}; for (const k in inflData) if (inflData[k] && !cur[k]) fillEmpty[k] = inflData[k]; if (Object.keys(fillEmpty).length) await saveInfl(iid, fillEmpty); }
         else { const r = await saveInfl(null, { ...inflData, nominated_by: me, source: 'campaign', acq_status: 'none' }); if (!r) { bad++; continue; } iid = r.id; el.dataset.infl = iid; }
         const price = f(el, 'price');
-        const dealData = { influencer_id: iid, campaign_id: cid, member_id: el.dataset.deal ? undefined : me, name: inflData.name, handle, phone: phone || '', platform: platText(keys), acc_type: inflData.acc_type, city: inflData.city, price: price === '' ? null : Number(price), ad_type: f(el, 'ad_type'), planned_date: f(el, 'planned_date') || null, hook: f(el, 'hook'), sn_user: inflData.snap_user, country: inflData.country, rcv_name: inflData.name, rcv_phone: phone || '', rcv_city: inflData.city, address: inflData.district };
+        const dealData = { influencer_id: iid, campaign_id: cid, member_id: el.dataset.deal ? undefined : me, name: inflData.name, handle, phone: phone || '', platform: platText(keys), acc_type: inflData.acc_type, city: inflData.city, price: price === '' ? null : Number(price), price_before: f(el, 'price_before') === '' ? null : Number(f(el, 'price_before')), ad_type: f(el, 'ad_type'), planned_date: f(el, 'planned_date') || null, hook: f(el, 'hook'), sn_user: inflData.snap_user, country: inflData.country, rcv_name: inflData.name, rcv_phone: phone || '', rcv_city: inflData.city, address: inflData.district };
         Object.keys(dealData).forEach(k => dealData[k] === undefined && delete dealData[k]);
         if (send && done) Object.assign(dealData, { sent_at: nowIso(), batch_id: batch, approval: 'pending', decision_reason: '' });
         const r = await saveDeal(el.dataset.deal || null, dealData); if (!r) { bad++; continue; } el.dataset.deal = r.id; saved++; if (send && done) sent++;
@@ -703,7 +706,7 @@ function dealRow(x, bulk, k) {
 }
 /* البيانات الإلزامية قبل ما ينتقل الملف من مرحلة لمرحلة: المبلغ (0 = مقابل منتج) ومنصة التنزيل.
    اعتماد الاستقطاب مستثنى لأن ما فيه خانة مبلغ في تلك المرحلة. */
-const needs = d => { const m = []; if (d.price == null || d.price === '' || isNaN(Number(d.price))) m.push('المبلغ'); if (!platKeys(d).length) m.push('منصة التنزيل'); return m; };
+const needs = d => { const m = []; if (d.price == null || d.price === '' || isNaN(Number(d.price))) m.push('المبلغ'); if (d.price_before == null || d.price_before === '') m.push('السعر قبل التفاوض'); if (!platKeys(d).length) m.push('منصة التنزيل'); return m; };
 const GO_LABEL = { camp_fix: 'عدّل الترشيح', camp_draft: 'كمّل الترشيح', intake: 'كمّل العنوان', video: 'أرسل المقطع الخام', video_fix: 'أعد إرسال المقطع', draft: 'راجع المقطع', post: 'سجّل النزول', ship_fail: 'تابع التسليم' };
 const dayWord = n => n <= 0 ? 'اليوم' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? n + ' أيام' : n + ' يوم';
 const moreWrap = (html, name) => html ? `<span class="morew"><button class="btn sm icon" data-more type="button" aria-haspopup="true" aria-expanded="false" aria-label="إجراءات أخرى: ${esc(name)}">⋯</button><span class="more">${html}</span></span>` : '';
@@ -771,7 +774,7 @@ $('mineBody').addEventListener('click', async e => {
   const b = e.target.closest('[data-dobulk]'); if (b) {
     const k = b.dataset.dobulk; const ids = [...b.closest('[data-g]').querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk);
     if (!ids.length) return toast('حدّد ملف واحد على الأقل', true);
-    if (['appr', 'pay', 'pay_go'].includes(k)) { const bad = ids.map(id => S.deals.find(x => x.id === id)).filter(d => d && (k === 'appr' ? needs(d).length : needs(d).includes('المبلغ'))); if (bad.length) return toast(`ما يكمل «${BULK[k][0]}»: المبلغ أو المنصة ناقصة في ${bad.map(d => d.name).join('، ')}. ${k === 'appr' ? 'رجّعها للتعديل أو شيل تحديدها' : 'اكتب المبلغ في الملف أول'}`, true); }
+    if (['appr', 'pay', 'pay_go'].includes(k)) { const bad = ids.map(id => S.deals.find(x => x.id === id)).filter(d => d && (k === 'appr' ? needs(d).length : needs(d).includes('المبلغ'))); if (bad.length) return toast(`ما يكمل «${BULK[k][0]}»: بيانات ناقصة (المبلغ أو السعر قبل التفاوض أو المنصة) في ${bad.map(d => d.name).join('، ')}. ${k === 'appr' ? 'رجّعها للتعديل أو شيل تحديدها' : 'اكتب المبلغ في الملف أول'}`, true); }
     if (!await confirmBox(`${BULK[k][0]}: ${ids.length} ملف؟`)) return;
     b.disabled = true; let ok = 0; for (const id of ids) { const d = S.deals.find(x => x.id === id); if (d && await saveDeal(id, BULK[k][1](d))) ok++; }
     toast(`تحدّث ${ok} ملف`); render();
@@ -846,16 +849,18 @@ function openDeal(id) {
   ${stepper}
   ${d.decision_reason && d.decision_reason.trim() && ['needs_edit', 'rejected'].includes(d.approval) ? `<div class="dup"><b>${d.approval === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(d.decision_reason)}</div>` : ''}
   ${d.closed_at && d.approval !== 'rejected' ? `<div class="dup">مغلق: ${esc(d.closed_reason)}</div>` : ''}
-  ${sec(0, `<div class="grid2" ${mine && (d.approval !== 'approved' || adm) ? '' : 'inert'}>
+  ${sec(0, `<div class="grid2" ${(d.approval !== 'approved' ? mine : (adm || appr)) ? '' : 'inert'}>
      <div class="field"><label for="f_name">الاسم</label><input type="text" id="f_name" value="${v('name')}"></div>
      <div class="field"><label for="f_acc_type">نوع المحتوى</label><select id="f_acc_type">${optsBlank(ACC_TYPES, d.acc_type)}</select></div>
-     <div class="field"><label for="f_price">المبلغ</label><input type="number" id="f_price" value="${v('price')}"></div>
-     <div class="field"><label for="f_ad_type">نوع الإعلان</label><select id="f_ad_type">${optsBlank(AD_TYPES, d.ad_type)}</select></div>
+     <div class="field"><label for="f_price_before">السعر قبل التفاوض</label><input type="number" min="0" id="f_price_before" value="${v('price_before')}"></div>
+     <div class="field"><label for="f_price">المبلغ بعد التفاوض</label><input type="number" id="f_price" value="${v('price')}"></div>
+     <div class="field"><label for="f_ad_type">نوع الإعلان</label><select id="f_ad_type">${optsBlank(AD_TYPES, adT(d.ad_type))}</select></div>
      <div class="field"><label for="f_planned_date">تاريخ النشر المتوقع</label><input type="date" id="f_planned_date" value="${v('planned_date')}"></div>
      <div class="field"><label for="f_hook">هوك الفيديو</label><input type="text" id="f_hook" value="${v('hook')}"></div>
    </div>${platChecks('d', keys)}
    <div class="field"><label for="f_notes">ملاحظات</label><textarea id="f_notes">${v('notes')}</textarea></div>
-   ${mine ? `<div class="row"><button class="btn" data-act="save0" type="button">حفظ</button>${(!d.sent_at && d.approval === 'pending') || d.approval === 'needs_edit' ? `<button class="btn primary" data-act="send" type="button">${d.approval === 'needs_edit' ? 'أعد الإرسال للاعتماد' : 'أرسل للاعتماد'} (${esc(apprFor(d.member_id))})</button>` : ''}</div>` : ''}`, d.sent_at ? 'أُرسل ' + dShort(d.sent_at) : 'مسودة')}
+   ${d.approval === 'approved' && !(adm || appr) ? `<div class="note">البيانات الأساسية (الاسم، الأسعار، المنصات، النوع) مقفولة بعد الاعتماد، وتعديلها بموافقة ${esc(apprNames())} أو عبدالمحسن.${d.member_id === me ? ' <button class="btn sm" data-act="editreq" type="button">اطلب تعديل</button>' : ''}</div>` : ''}
+   ${mine || appr ? `<div class="row"><button class="btn" data-act="save0" type="button">حفظ</button>${(!d.sent_at && d.approval === 'pending') || d.approval === 'needs_edit' ? `<button class="btn primary" data-act="send" type="button">${d.approval === 'needs_edit' ? 'أعد الإرسال للاعتماد' : 'أرسل للاعتماد'} (${esc(apprFor(d.member_id))})</button>` : ''}</div>` : ''}`, d.sent_at ? 'أُرسل ' + dShort(d.sent_at) : 'مسودة')}
   ${sec(1, appr && (d.approval === 'pending' && d.sent_at || d.approval === 'backup') ? `<div class="row"><button class="btn good" data-act="approve" type="button">اعتماد</button><button class="btn" data-act="needs_edit" type="button">يحتاج تعديل</button><button class="btn" data-act="backup" type="button">احتياط</button><button class="btn danger" data-act="reject" type="button">رفض</button></div>` : `<div class="muted">${d.approval === 'approved' ? 'معتمد من ' + esc(memName(d.approved_by)) : d.approval === 'pending' ? 'بانتظار ' + esc(apprFor(d.member_id)) : esc(d.approval)}</div>`, d.approval === 'approved' ? 'معتمد ' + dShort(d.approved_at) : '')}
   ${sec(2, `<div class="muted small">طريقتين: تكتب العنوان بنفسك، أو ترسل الرابط للمؤثر يعبّيه هو ومعه حسابه البنكي.</div>
    <div class="grid2" ${mine || ship ? '' : 'inert'}>
@@ -887,11 +892,11 @@ function openDeal(id) {
     if (adm) renderBank(d);
     const val = k => { const e = $('f_' + k); return e.type === 'checkbox' ? e.checked : e.type === 'number' ? (e.value === '' ? null : Number(e.value)) : e.value.trim(); };
     const pick = ks => Object.fromEntries(ks.map(k => [k, val(k)]));
-    const base = () => ({ ...pick(['name', 'acc_type', 'price', 'ad_type', 'hook', 'notes']), planned_date: val('planned_date') || null, platform: platText(readPlats(root, 'd')) });
+    const base = () => ({ ...pick(['name', 'acc_type', 'price', 'price_before', 'ad_type', 'hook', 'notes']), planned_date: val('planned_date') || null, platform: platText(readPlats(root, 'd')) });
     const dl = p => { const ch = { [p + '_at']: nowIso() }; if (p === 'sn') { ch.sn_user = val('sn_user'); ch.sn_code = val('sn_code'); if (!ch.sn_user) { toast('اكتب يوزر سناب', true); return null; } } else { ch[p + '_code'] = val(p + '_code'); if (!ch[p + '_code']) { toast('اكتب الكود', true); return null; } } if (p === 'tt' && val('post_url')) ch.post_url = val('post_url'); if (allDelivered({ ...d, ...ch })) Object.assign(ch, { posted_at: nowIso(), video_ok_at: d.video_ok_at || nowIso() }); return ch; };
     const A = {
       save0: base,
-      send: () => { const b = base(); if (!b.platform) { toast('حدّد منصة التنزيل', true); return null; } if (b.price == null) { toast('اكتب المبلغ قبل الإرسال. إذا مقابل منتج اكتب 0', true); return null; } if (!b.name) { toast('اكتب اسم المؤثر', true); return null; } return { ...b, sent_at: nowIso(), approval: 'pending', decision_reason: '' }; },
+      send: () => { const b = base(); if (!b.platform) { toast('حدّد منصة التنزيل', true); return null; } if (b.price == null) { toast('اكتب المبلغ بعد التفاوض قبل الإرسال. إذا مقابل منتج اكتب 0', true); return null; } if (b.price_before == null) { toast('اكتب السعر قبل التفاوض قبل الإرسال للاعتماد', true); return null; } if (!b.name) { toast('اكتب اسم المؤثر', true); return null; } return { ...b, sent_at: nowIso(), approval: 'pending', decision_reason: '' }; },
       approve: () => { const m = needs(d); if (m.length) { toast(`ما ينعتمد وهو ناقص: ${m.join('، ')}. رجّعه بـ«يحتاج تعديل»`, true); return null; } return { approval: 'approved', approved_at: nowIso(), approved_by: me, decision_reason: '' }; },
       backup: () => ({ approval: 'backup' }),
       addr: () => { const p = normPhone(val('rcv_phone')); if (val('rcv_phone') && p === null) { toast('رقم الجوال مو صحيح', true); return null; } return { ...pick(['rcv_name', 'rcv_city', 'address', 'country']), rcv_phone: p || '' }; },
@@ -911,6 +916,10 @@ function openDeal(id) {
       if (a === 'reject' || a === 'needs_edit') { b.disabled = true; const r = await decideDeal(d, a); b.disabled = false; if (r) { toast('انحفظ القرار — رجعت لصانع المحتوى مع السبب في «مهامي» حقته'); openDeal(d.id); } return; }
       if (a.startsWith('lv_')) { b.disabled = true; if (await launchPlat(d, a.slice(3))) { toast('انسجّل التشغيل ✓ — الملف يكتمل بعد تشغيل كل المنصات'); openDeal(d.id); } return; }
       if (a === 'vfix') { const why = await reasonBox('وش المطلوب يتعدّل في المقطع؟', true); if (why == null) return; b.disabled = true; const r = await saveDeal(d.id, { draft_at: null, rounds: (d.rounds || 0) + 1, draft_feedback: why.trim() }); b.disabled = false; if (r) { toast('رجع لصانع المحتوى مع ملاحظتك'); openDeal(d.id); } return; }
+      if (a === 'editreq') { const why = await reasonBox('وش تبي يتعدّل؟ اكتب الخانة والقيمة الصحيحة', true); if (why == null) return;
+        const ap = isApprover() && !isAdmin() ? S.members.find(m => m.is_admin && m.active) : withRole('approver').filter(m => !m.is_admin || (m.roles || []).includes('approver'))[0];
+        b.disabled = true; const r = await saveReq(null, { kind: 'edit', deal_id: d.id, title: `تعديل بيانات بعد الاعتماد: ${d.name}`, details: why.trim(), to_member: ap ? ap.id : null, from_member: me }); b.disabled = false;
+        if (r) toast('انرسل طلب التعديل لـ' + (ap ? ap.name : apprNames()) + '. يطلع له في «مهامي»'); return; }
       if (a.startsWith('dl_')) ch = dl(a.slice(3));
       else if (a.startsWith('code_')) { const p = a.slice(5); ch = p === 'sn' ? { sn_user: val('sn_user'), sn_code: val('sn_code') } : { [p + '_code']: val(p + '_code') }; }
       else ch = A[a]();

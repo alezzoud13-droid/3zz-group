@@ -105,7 +105,7 @@
       post_url: '', tt_code: '', ig_code: '', sn_code: '', hook: '', posted_at: null,
       ad_name: '', live_at: null, paid_at: null, closed_reason: '', closed_at: null,
       created_by: owner, created_at: ago(20), updated_by: owner, updated_at: ago(1),
-      batch_id: null, decision_reason: '', ad_type: 'منزلي', planned_date: null, price_before: null,
+      batch_id: null, decision_reason: '', ad_type: 'منزلي', planned_date: null, price_before: 1200,   // من 13 نوفمبر: السعر قبل التفاوض إلزامي قبل الإرسال والاعتماد
       ship_failed_at: null, ship_note: '', sn_user: '',
       tt_at: null, ig_at: null, sn_at: null, tt_live_at: null, ig_live_at: null, sn_live_at: null,
       draft_note: '', draft_feedback: '', ship_company: '', pay_ok_at: null, pay_ok_by: null
