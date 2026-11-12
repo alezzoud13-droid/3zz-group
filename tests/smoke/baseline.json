@@ -1,0 +1,595 @@
+{
+  "meta": {"harness":"1466ee6182e4","frozenNow":"2026-11-11T08:00:00.000Z","note":"recorded by smoke.js --update; the per-scenario writes/exports are the contract, render summaries are informational"},
+  "render": {
+    "render:admin#mine": {"ids":{"mineAs":{"kids":10},"mineBody":{"kids":7,"button":17,"field":9}},"data":{"data-g":7,"data-openinfl":1,"data-all":3,"data-dobulk":3,"data-bulk":6,"data-dq":2,"data-id":2,"data-open":7,"data-req":2,"data-payx":2},"groups":["members=0","acq_review=1","appr=1","quota_req=2","draft=1","pay=3","pay_go=2"],"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1,"tr":43,"table":1}},"data":{"data-openinfl":42},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#camps": {"ids":{"cList":{"kids":3,"tr":12,"table":3,"button":11,"field":21}},"data":{"data-camp":3,"data-k":12,"data-csave":3,"data-q":9,"data-qsave":3,"data-qeven":3,"data-nom":2},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#pipe": {"ids":{"board":{"kids":7,"button":7},"pMem":{"kids":4},"pCamp":{"kids":5},"pList":{"kids":1,"tr":31,"table":1}},"data":{"data-col":7,"data-open":30},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#req": {"ids":{"rScope":{"kids":4},"rList":{"kids":1,"button":1}},"data":{"data-req":1},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#today": {"ids":{"tAuto":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#dash": {"ids":{"dPeriod":{"kids":4},"dTiles":{"kids":8},"kMonth":{"kids":12},"kCard":{"kids":1,"tr":4,"table":1},"dBlock":{"kids":1,"tr":3,"table":1},"dDaily":{"kids":1,"tr":9,"table":1},"dNotes":{"kids":1,"tr":3,"table":1},"dSteps":{"kids":1,"tr":7,"table":1},"dAcq":{"kids":1,"tr":4,"table":1},"dLaunch":{"kids":1,"tr":5,"table":1},"dCreators":{"kids":1,"tr":4,"table":1},"dReqs":{"kids":1,"tr":5,"table":1}},"data":{"data-kpi":3},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:admin#setup": {"ids":{"sMembers":{"kids":1,"tr":11,"table":1,"button":10,"field":110},"sSla":{"kids":6,"field":6},"sTasks":{"kids":7,"field":7},"sKpi":{"kids":4,"field":4},"sBank":{"kids":2,"button":1}},"data":{"data-m":10,"data-k":30,"data-role":80,"data-msave":10,"data-cap":3},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:approver#mine": {"ids":{"mineBody":{"kids":7,"button":25,"field":8}},"data":{"data-g":7,"data-openinfl":3,"data-all":2,"data-dobulk":2,"data-bulk":6,"data-dq":8,"data-id":8,"data-open":9,"data-req":1,"data-nom":1,"data-payx":1},"groups":["acq_review=3","appr=4","quota_req=1","draft=2","camp_quota=1","pay_go=2","park=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1,"tr":43,"table":1}},"data":{"data-openinfl":42},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#camps": {"ids":{"cList":{"kids":3,"tr":12,"table":3,"button":8,"field":6}},"data":{"data-camp":3,"data-q":6,"data-qsave":3,"data-qeven":3,"data-nom":2},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#pipe": {"ids":{"board":{"kids":7,"button":7},"pMem":{"kids":4},"pCamp":{"kids":5},"pList":{"kids":1,"tr":31,"table":1}},"data":{"data-col":7,"data-open":30},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#req": {"ids":{"rScope":{"kids":4},"rList":{"kids":1,"button":3}},"data":{"data-req":3},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#today": {"ids":{"tAuto":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#dash": {"ids":{"mineBody":{"kids":7,"button":25,"field":8}},"data":{"data-g":7,"data-openinfl":3,"data-all":2,"data-dobulk":2,"data-bulk":6,"data-dq":8,"data-id":8,"data-open":9,"data-req":1,"data-nom":1,"data-payx":1},"groups":["acq_review=3","appr=4","quota_req=1","draft=2","camp_quota=1","pay_go=2","park=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:approver#setup": {"ids":{"mineBody":{"kids":7,"button":25,"field":8}},"data":{"data-g":7,"data-openinfl":3,"data-all":2,"data-dobulk":2,"data-bulk":6,"data-dq":8,"data-id":8,"data-open":9,"data-req":1,"data-nom":1,"data-payx":1},"groups":["acq_review=3","appr=4","quota_req=1","draft=2","camp_quota=1","pay_go=2","park=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"12","reqCnt":""}},
+    "render:creator#mine": {"ids":{"mineBody":{"kids":13,"button":16}},"data":{"data-g":13,"data-req":3,"data-openinfl":3,"data-open":8,"data-nom":2},"groups":["req_new=1","req_review=2","acq_fix=1","camp_fix=1","video_fix=1","camp_quota=2","acq_draft=1","camp_draft=1","acq_contact=1","intake=1","video=1","post=2","park=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1,"tr":26,"table":1}},"data":{"data-openinfl":25},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#camps": {"ids":{"cList":{"kids":3,"tr":6,"table":3,"button":2}},"data":{"data-camp":3,"data-nom":2},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#pipe": {"ids":{"board":{"kids":7,"button":7},"pMem":{"kids":4},"pCamp":{"kids":5},"pList":{"kids":1,"tr":17,"table":1}},"data":{"data-col":7,"data-open":16},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#req": {"ids":{"rScope":{"kids":4},"rList":{"kids":1,"button":5}},"data":{"data-req":5},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#today": {"ids":{"tAuto":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#dash": {"ids":{"mineBody":{"kids":13,"button":16}},"data":{"data-g":13,"data-req":3,"data-openinfl":3,"data-open":8,"data-nom":2},"groups":["req_new=1","req_review=2","acq_fix=1","camp_fix=1","video_fix=1","camp_quota=2","acq_draft=1","camp_draft=1","acq_contact=1","intake=1","video=1","post=2","park=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:creator#setup": {"ids":{"mineBody":{"kids":13,"button":16}},"data":{"data-g":13,"data-req":3,"data-openinfl":3,"data-open":8,"data-nom":2},"groups":["req_new=1","req_review=2","acq_fix=1","camp_fix=1","video_fix=1","camp_quota=2","acq_draft=1","camp_draft=1","acq_contact=1","intake=1","video=1","post=2","park=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"11","reqCnt":"1"}},
+    "render:shipper#mine": {"ids":{"mineBody":{"kids":6,"button":16,"field":6}},"data":{"data-g":6,"data-req":3,"data-shipx":3,"data-salx":3,"data-open":5,"data-all":2,"data-dobulk":2,"data-bulk":4},"groups":["req_new=1","req_fix=1","ship_fail=1","ship_send=2","ship_wait=2","req_in=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#camps": {"ids":{"cList":{"kids":3,"tr":3,"table":3}},"data":{"data-camp":3},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#pipe": {"ids":{"board":{"kids":7,"button":7},"pMem":{"kids":4},"pCamp":{"kids":5},"pList":{"kids":1,"tr":24,"table":1}},"data":{"data-col":7,"data-open":23},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#req": {"ids":{"rScope":{"kids":4},"rList":{"kids":1,"button":2}},"data":{"data-req":2},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#today": {"ids":{"tAuto":{"kids":1},"tTasks":{"kids":3,"field":2}},"data":{"data-t":2},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#dash": {"ids":{"mineBody":{"kids":6,"button":16,"field":6}},"data":{"data-g":6,"data-req":3,"data-shipx":3,"data-salx":3,"data-open":5,"data-all":2,"data-dobulk":2,"data-bulk":4},"groups":["req_new=1","req_fix=1","ship_fail=1","ship_send=2","ship_wait=2","req_in=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:shipper#setup": {"ids":{"mineBody":{"kids":6,"button":16,"field":6}},"data":{"data-g":6,"data-req":3,"data-shipx":3,"data-salx":3,"data-open":5,"data-all":2,"data-dobulk":2,"data-bulk":4},"groups":["req_new=1","req_fix=1","ship_fail=1","ship_send=2","ship_wait=2","req_in=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"7","reqCnt":"1"}},
+    "render:media#mine": {"ids":{"mineBody":{"kids":2,"button":7}},"data":{"data-g":2,"data-launch":3,"data-id":3,"data-open":3,"data-req":1},"groups":["launch=3","req_in=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#camps": {"ids":{"cList":{"kids":3,"tr":3,"table":3}},"data":{"data-camp":3},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#pipe": {"ids":{"board":{"kids":7,"button":7},"pMem":{"kids":4},"pCamp":{"kids":5},"pList":{"kids":1,"tr":9,"table":1}},"data":{"data-col":7,"data-open":8},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#req": {"ids":{"rScope":{"kids":4},"rList":{"kids":1,"button":2}},"data":{"data-req":2},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#today": {"ids":{"tAuto":{"kids":1},"tTasks":{"kids":2,"field":1}},"data":{"data-t":1},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#dash": {"ids":{"mineBody":{"kids":2,"button":7}},"data":{"data-g":2,"data-launch":3,"data-id":3,"data-open":3,"data-req":1},"groups":["launch=3","req_in=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:media#setup": {"ids":{"mineBody":{"kids":2,"button":7}},"data":{"data-g":2,"data-launch":3,"data-id":3,"data-open":3,"data-req":1},"groups":["launch=3","req_in=1"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"4","reqCnt":""}},
+    "render:snap#mine": {"ids":{"mineBody":{"kids":1,"button":7}},"data":{"data-g":1,"data-ziadx":1,"data-launch":3,"data-id":3,"data-open":3},"groups":["snap_follow=3"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#camps": {"ids":{"cList":{"kids":3,"tr":3,"table":3}},"data":{"data-camp":3},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#pipe": {"ids":{"board":{"kids":7,"button":7},"pMem":{"kids":4},"pCamp":{"kids":5},"pList":{"kids":1,"tr":9,"table":1}},"data":{"data-col":7,"data-open":8},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#req": {"ids":{"rScope":{"kids":4},"rList":{"kids":1,"button":1}},"data":{"data-req":1},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#today": {"ids":{"tAuto":{"kids":1}},"data":{},"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#dash": {"ids":{"mineBody":{"kids":1,"button":7}},"data":{"data-g":1,"data-ziadx":1,"data-launch":3,"data-id":3,"data-open":3},"groups":["snap_follow=3"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:snap#setup": {"ids":{"mineBody":{"kids":1,"button":7}},"data":{"data-g":1,"data-ziadx":1,"data-launch":3,"data-id":3,"data-open":3},"groups":["snap_follow=3"],"shell":{"tabs":["mine","acq","camps","pipe","req","today"],"mineCnt":"3","reqCnt":""}},
+    "render:anon(login)": {"ids":{"nameWrap":{"kids":2,"field":1,"hidden":true}},"data":{},"shell":{"tabs":[],"mineCnt":"","reqCnt":""}},
+    "render:pending(wait)": {"ids":{},"data":{},"shell":{"tabs":[],"mineCnt":"","reqCnt":""}},
+    "render:admin#mine(team)": {"ids":{"mineAs":{"kids":10},"mineBody":{"kids":1,"tr":10,"table":1}},"data":{"data-as":9},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
+    "render:intake(valid)": {"ids":{"box":{"kids":2},"form":{"kids":9,"button":1,"field":9},"bankWrap":{"kids":5,"field":3,"hidden":true}},"data":{}},
+    "render:intake(bad-token)": {"ids":{"box":{"kids":2},"form":{"kids":9,"button":1,"field":9,"hidden":true},"bankWrap":{"kids":5,"field":3,"hidden":true}},"data":{}}
+  },
+  "scenarios": {
+    "approver_bulk_approve_selected_nominations": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pending1"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending2"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_bulk_approve_all_after_cancel": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pending3"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending4"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending1"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending2"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_reject_and_send_back_for_edit": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pending3"},"payload":{"approval":"rejected","approved_at":null,"approved_by":"@member.approver","closed_reason":"رفضه معتمد تجريبي","decision_reason":"المحتوى ما يناسب"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending4"},"payload":{"approval":"needs_edit","approved_by":"@member.approver","decision_reason":"عدّل السعر وأعد الإرسال","sent_at":null}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_deal_modal_backup_approve_reject": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pending1"},"payload":{"approval":"backup"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending1"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.approver","decision_reason":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending3"},"payload":{"approval":"rejected","approved_at":null,"approved_by":"@member.approver","closed_reason":"رفضه معتمد تجريبي","decision_reason":"مرفوض من داخل الملف"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pending4"},"payload":{"approval":"needs_edit","approved_by":"@member.approver","decision_reason":"يحتاج تعديل من داخل الملف","sent_at":null}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_acquisition_approve_and_send_back": {
+      "writes": [
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_pending"},"payload":{"acq_decided_at":"<ts>","acq_decided_by":"@member.approver","acq_reason":"","acq_status":"approved"}},
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_pending2"},"payload":{"acq_decided_at":"<ts>","acq_decided_by":"@member.approver","acq_reason":"صحّح رابط الحساب","acq_status":"needs_edit"}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_acquisition_reject_KNOWN_BUG": {
+      "writes": [
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_pending3"},"payload":{"acq_decided_at":"<ts>","acq_decided_by":"@member.approver","acq_reason":"حساب غير مناسب","acq_status":"reject"}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_raw_video_approve_and_return": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.draft_pending1"},"payload":{"draft_feedback":"","video_ok_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft_pending2"},"payload":{"draft_at":null,"draft_feedback":"الصوت ضعيف، أعد التسجيل","rounds":1}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_bulk_pay_approve": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.launched_wait_pay"},"payload":{"pay_ok_at":"<ts>","pay_ok_by":"@member.admin"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.launched_wait_pay2"},"payload":{"pay_ok_at":"<ts>","pay_ok_by":"@member.admin"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.posted_wait_launch"},"payload":{"pay_ok_at":"<ts>","pay_ok_by":"@member.admin"}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_pay_go_bulk_paid": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pay_ok1"},"payload":{"paid_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.pay_ok2"},"payload":{"paid_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_deal_modal_payok_paid_undo": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.launched_wait_pay"},"payload":{"pay_ok_at":"<ts>","pay_ok_by":"@member.admin"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.launched_wait_pay"},"payload":{"paid_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.launched_wait_pay"},"payload":{"paid_at":null}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_deal_modal_paid": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pay_ok1"},"payload":{"paid_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_bulk_shipped": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.ready_ship2"},"payload":{"shipped_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.ready_ship1"},"payload":{"shipped_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_bulk_delivered": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.shipped1"},"payload":{"delivered_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.shipped2"},"payload":{"delivered_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_deal_modal_shipped_failed_delivered": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.ready_ship1"},"payload":{"ship_company":"أرامكس","ship_failed_at":null,"ship_note":"","shipped_at":"<ts>","tracking":"TRK-SMOKE-1"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.ready_ship1"},"payload":{"ship_failed_at":"<ts>","ship_note":"العنوان ناقص"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.ready_ship1"},"payload":{"delivered_at":"<ts>","ship_company":"أرامكس","ship_failed_at":null,"ship_note":"العنوان ناقص","shipped_at":"<ts>","tracking":"TRK-SMOKE-1"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_deal_modal_delivered_directly": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.ship_failed"},"payload":{"delivered_at":"<ts>","ship_company":"سمسا","ship_failed_at":null,"ship_note":"المستلم ما يرد","shipped_at":"<ts>","tracking":"SMK420"}}
+      ],
+      "exports": [
+      ]
+    },
+    "media_launch_from_mine": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.posted_wait_launch"},"payload":{"tt_live_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.posted_wait_launch"},"payload":{"ad_name":"حملة ألف | مؤثر تجريبي 24 | صانع ثاني","live_at":"<ts>","sn_live_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "media_launch_in_deal_modal": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.partly_posted"},"payload":{"tt_live_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "snap_launch_from_mine": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.partly_posted"},"payload":{"tt_live_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_acquisition_draft_then_send": {
+      "writes": [
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_new_acq","p_phone":""}},
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_new_acq","p_phone":""}},
+        {"table":"influencers","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","account_status":"استقطاب","acq_sent_at":null,"acq_status":"draft","handle":"smoke_new_acq","name":"مؤثر استقطاب جديد","nominated_by":"@member.creator","nominated_on":"<today>","source":"acq","tiktok_url":"https://www.tiktok.com/@smoke_new_acq"}},
+        {"table":"influencers","op":"update","match":{"id":"<uuid>"},"payload":{"acc_type":"صانع محتوى","account_status":"استقطاب","acq_reason":"","acq_sent_at":"<ts>","acq_status":"pending","handle":"smoke_new_acq","name":"مؤثر استقطاب جديد","name_en":"","tiktok_url":"https://www.tiktok.com/@smoke_new_acq"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_acquisition_send_with_duplicate_checks": {
+      "writes": [
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_infl_36","p_phone":""}},
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_infl_36","p_phone":""}},
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_infl_36","p_phone":""}},
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_direct_send","p_phone":""}},
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_direct_send","p_phone":""}},
+        {"table":"influencers","op":"insert","match":null,"payload":{"acc_type":"مقيم عطور عربي","account_status":"استقطاب","acq_sent_at":"<ts>","acq_status":"pending","handle":"smoke_direct_send","name":"مؤثر مكرر","nominated_by":"@member.creator","nominated_on":"<today>","source":"acq","tiktok_url":"https://www.tiktok.com/@smoke_direct_send"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_acquisition_fix_and_resend": {
+      "writes": [
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_needs_edit"},"payload":{"acc_type":"صانع محتوى","account_status":"استقطاب","handle":"smoke_infl_39","name":"مؤثر تجريبي 39","name_en":"Smoke Fixed","tiktok_url":"https://www.tiktok.com/@smoke_infl_39"}},
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_needs_edit"},"payload":{"acc_type":"صانع محتوى","account_status":"استقطاب","acq_reason":"","acq_sent_at":"<ts>","acq_status":"pending","handle":"smoke_infl_39","name":"مؤثر تجريبي 39","name_en":"Smoke Fixed","tiktok_url":"https://www.tiktok.com/@smoke_infl_39"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_acquisition_contact_and_agree": {
+      "writes": [
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_approved"},"payload":{"city":"","contact_summary":"اتفقنا بعد محاولتين","contacts":[{"channel":"واتساب","date":"2026-11-07","result":"ما رد"},{"channel":"سناب شات","date":"<today>","result":"تم الاتفاق"}],"country":"السعودية","currency":"SAR","district":"","had_problem":null,"ig_user":"","phone":"","platforms":"تيك توك","price_after":null,"price_before":3000,"problem":"","snap_user":""}},
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_approved"},"payload":{"agreed_at":"<ts>","city":"الرياض","contact_summary":"اتفقنا بعد محاولتين","contacts":[{"channel":"واتساب","date":"2026-11-07","result":"ما رد"},{"channel":"سناب شات","date":"<today>","result":"تم الاتفاق"}],"country":"السعودية","currency":"SAR","district":"حي الاختبار – RRRD9999","had_problem":null,"ig_user":"","phone":"+966551112233","platforms":"تيك توك","price_after":2500,"price_before":3000,"problem":"","snap_user":""}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_campaign_nomination_draft_then_send": {
+      "writes": [
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_new_nominee","p_phone":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","campaign_id":"@camp.beta","city":"","country":"السعودية","handle":"smoke_infl_01","hook":"","influencer_id":"@infl.of_draft","name":"مؤثر تجريبي 01","phone":"","planned_date":null,"platform":"تيك توك","price":500,"rcv_city":"","rcv_name":"مؤثر تجريبي 01","rcv_phone":"","sn_user":""}},
+        {"table":"infl_lookup","op":"rpc","match":null,"payload":{"p_handle":"smoke_new_nominee","p_phone":"+966557776655"}},
+        {"table":"influencers","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","account_status":"استقطاب","acq_status":"none","city":"الرياض","country":"","district":"حي الترشيح – RRRD7777","handle":"smoke_new_nominee","ig_user":"","name":"مرشح جديد","name_en":"","nominated_by":"@member.creator","phone":"+966557776655","platforms":"تيك توك + سناب شات","snap_user":"smoke_nominee_snap","source":"campaign","tiktok_url":"https://www.tiktok.com/@smoke_new_nominee"}},
+        {"table":"deals","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"حي الترشيح – RRRD7777","campaign_id":"@camp.beta","city":"الرياض","country":"","handle":"smoke_new_nominee","hook":"هوك الترشيح","influencer_id":"<uuid>","member_id":"@member.creator","name":"مرشح جديد","phone":"+966557776655","planned_date":"2030-02-01","platform":"تيك توك + سناب شات","price":750,"rcv_city":"الرياض","rcv_name":"مرشح جديد","rcv_phone":"+966557776655","sn_user":"smoke_nominee_snap"}},
+        {"table":"deals","op":"update","match":{"id":"<uuid>"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"حي الترشيح – RRRD7777","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.beta","city":"الرياض","country":"","decision_reason":"","handle":"smoke_new_nominee","hook":"هوك الترشيح","influencer_id":"<uuid>","name":"مرشح جديد","phone":"+966557776655","planned_date":"2030-02-01","platform":"تيك توك + سناب شات","price":750,"rcv_city":"الرياض","rcv_name":"مرشح جديد","rcv_phone":"+966557776655","sent_at":"<ts>","sn_user":"smoke_nominee_snap"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.beta","city":"","country":"السعودية","decision_reason":"","handle":"smoke_infl_01","hook":"","influencer_id":"@infl.of_draft","name":"مؤثر تجريبي 01","phone":"","planned_date":null,"platform":"تيك توك","price":500,"rcv_city":"","rcv_name":"مؤثر تجريبي 01","rcv_phone":"","sent_at":"<ts>","sn_user":""}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_nominate_agreed_influencer_to_campaign": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.needs_edit"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","address":"","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.alpha","city":"","country":"السعودية","decision_reason":"","handle":"smoke_infl_07","hook":"","influencer_id":"@infl.of_needs_edit","name":"مؤثر تجريبي 07","phone":"","planned_date":null,"platform":"تيك توك","price":1000,"rcv_city":"","rcv_name":"مؤثر تجريبي 07","rcv_phone":"","sent_at":"<ts>","sn_user":""}},
+        {"table":"deals","op":"insert","match":null,"payload":{"acc_type":"صانع محتوى","ad_type":"","address":"حي تجريبي – JJJD1090","approval":"pending","batch_id":"<uuid>","campaign_id":"@camp.alpha","city":"جدة","country":"السعودية","decision_reason":"","handle":"smoke_infl_41","hook":"","influencer_id":"@infl.acq_agreed","member_id":"@member.creator","name":"مؤثر تجريبي 41","phone":"+966500000090","planned_date":null,"platform":"تيك توك + سناب شات","price":2200,"rcv_city":"جدة","rcv_name":"مؤثر تجريبي 41","rcv_phone":"+966500000090","sent_at":"<ts>","sn_user":"smoke_agreed"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_delete_draft_nomination": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"closed_at":"<ts>","closed_reason":"حذفه الموظف قبل الإرسال"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_deal_draft_save_then_send": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","hook":"هوك جديد","name":"مؤثر تجريبي 01","notes":"ملاحظة على الترشيح","planned_date":null,"platform":"تيك توك","price":500}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","approval":"pending","decision_reason":"","hook":"هوك جديد","name":"مؤثر تجريبي 01","notes":"ملاحظة على الترشيح","planned_date":null,"platform":"تيك توك","price":500,"sent_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_deal_fix_and_resend": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.needs_edit"},"payload":{"acc_type":"صانع محتوى","ad_type":"منزلي","approval":"pending","decision_reason":"","hook":"","name":"مؤثر تجريبي 07","notes":"","planned_date":null,"platform":"تيك توك","price":900,"sent_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_quota_request": {
+      "writes": [
+        {"table":"requests","op":"insert","match":null,"payload":{"campaign_id":"@camp.alpha","details":"عندي ثلاث حسابات جاهزة","from_member":"@member.creator","kind":"quota","qty":3,"title":"زيادة 3 ترشيح في حملة حملة ألف","to_member":"@member.approver"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_save_flags_and_address": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.approved_noaddr"},"payload":{"no_pay":true,"no_ship":false}},
+        {"table":"deals","op":"update","match":{"id":"@deal.approved_noaddr"},"payload":{"address":"حي الاختبار – RRRD1234","country":"السعودية","rcv_city":"الرياض","rcv_name":"مستلم الاختبار","rcv_phone":"+966551234567"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_send_raw_video": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.delivered"},"payload":{"draft_at":"<ts>","draft_note":"أول نسخة من المقطع","draft_url":"https://drive.example.test/new-raw"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.video_fix"},"payload":{"draft_at":"<ts>","draft_note":"النسخة الأولى","draft_url":"https://drive.example.test/raw-v2"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_register_posting_per_platform": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.video_ok"},"payload":{"post_url":"https://www.tiktok.com/@smoke/video/42","tt_at":"<ts>","tt_code":"#SPARK-NEW"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.video_ok"},"payload":{"tt_code":"#SPARK-EDITED"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.video_ok"},"payload":{"posted_at":"<ts>","sn_at":"<ts>","sn_code":"","sn_user":"smoke_snap_user","video_ok_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_close_file": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.shipped1"},"payload":{"closed_at":"<ts>","closed_reason":"ما رد / ألغي"}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_reopen_closed_and_rejected": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.closed"},"payload":{"approval":"approved","closed_at":null,"closed_reason":"","sent_at":"<ts>"}},
+        {"table":"deals","op":"update","match":{"id":"@deal.rejected"},"payload":{"approval":"pending","closed_at":null,"closed_reason":"","sent_at":null}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_approves_approver_own_work": {
+      "writes": [
+        {"table":"deals","op":"update","match":{"id":"@deal.pending_ap"},"payload":{"approval":"approved","approved_at":"<ts>","approved_by":"@member.admin","decision_reason":""}},
+        {"table":"deals","op":"update","match":{"id":"@deal.draft_pending_ap"},"payload":{"draft_feedback":"","video_ok_at":"<ts>"}},
+        {"table":"influencers","op":"update","match":{"id":"@infl.acq_pending_ap"},"payload":{"acq_decided_at":"<ts>","acq_decided_by":"@member.admin","acq_reason":"","acq_status":"approved"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_request_create": {
+      "writes": [
+        {"table":"requests","op":"insert","match":null,"payload":{"details":"اشحن ثلاث عينات للعنوان المرفق","due":"2030-01-15","from_member":"@member.creator","kind":"ship","ref_url":"https://example.test/ref","size":"كرتون صغير","title":"شحنة عينات تجريبية","to_member":"@member.shipper"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"اشحن ثلاث عينات للعنوان المرفق","member_id":"@member.creator","request_id":"<uuid>","type":"created"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"<uuid>","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_request_start_and_deliver": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.new_ship","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.new_ship"},"payload":{"started_at":"<ts>","status":"doing"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"","member_id":"@member.shipper","request_id":"@req.new_ship","type":"start"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.new_ship","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.new_ship","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.new_ship"},"payload":{"result_url":"انشحنت: بوليصة SMK-77","started_at":"<ts>","status":"review"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"انشحنت: بوليصة SMK-77","member_id":"@member.shipper","request_id":"@req.new_ship","type":"deliver"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.new_ship","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.new_ship","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_request_redeliver_after_fix": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.fix_ship","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.fix_ship"},"payload":{"result_url":"أعدت الشحن للعنوان الصحيح","started_at":"<ts>","status":"review"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"أعدت الشحن للعنوان الصحيح","member_id":"@member.shipper","request_id":"@req.fix_ship","type":"deliver"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.fix_ship","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.shipper","request_id":"@req.fix_ship","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_request_approve_and_return_for_fix": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.review_ad","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.review_ad"},"payload":{"done_at":"<ts>","status":"done"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"","member_id":"@member.creator","request_id":"@req.review_ad","type":"approve"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.review_ad","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.review_ad","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.review_snap","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.review_snap"},"payload":{"done_at":null,"rounds":1,"status":"fix"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"الموعد غلط، عدّله","member_id":"@member.creator","request_id":"@req.review_snap","type":"fix"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.review_snap","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.review_snap","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_request_comment_edit_cancel": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"الميزانية 500 ريال","member_id":"@member.creator","request_id":"@req.doing_ad","type":"comment"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.doing_ad"},"payload":{"details":"تفاصيل الطلب التجريبي 02","due":"2026-11-10","ref_url":"","size":"","title":"إطلاق إعلان (معدّل)","to_member":"@member.media"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"العنوان: طلب تجريبي 02 ← إطلاق إعلان (معدّل)","member_id":"@member.creator","request_id":"@req.doing_ad","type":"edit"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.doing_ad"},"payload":{"status":"cancelled"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"","member_id":"@member.creator","request_id":"@req.doing_ad","type":"cancel"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.doing_ad","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "creator_request_reopen_done": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.done_design","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.done_design"},"payload":{"done_at":null,"rounds":1,"status":"fix"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"المقاس غلط","member_id":"@member.creator","request_id":"@req.done_design","type":"reopen"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.done_design","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.creator","request_id":"@req.done_design","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_quota_request_approve": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.approver","request_id":"@req.quota","seen_at":"<ts>"}},
+        {"table":"quota_grant","op":"rpc","match":null,"payload":{"p_campaign":"@camp.beta","p_member":"@member.creator","p_qty":2}},
+        {"table":"requests","op":"update","match":{"id":"@req.quota"},"payload":{"done_at":"<ts>","status":"done"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"الحصة صارت 5، والعدد المطلوب للحملة زاد بنفس المقدار","member_id":"@member.approver","request_id":"@req.quota","type":"quota_ok"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.approver","request_id":"@req.quota","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.approver","request_id":"@req.quota","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_quota_request_reject": {
+      "writes": [
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.admin","request_id":"@req.quota_ap","seen_at":"<ts>"}},
+        {"table":"requests","op":"update","match":{"id":"@req.quota_ap"},"payload":{"status":"cancelled"}},
+        {"table":"request_events","op":"insert","match":null,"payload":{"body":"الحملة مكتملة","member_id":"@member.admin","request_id":"@req.quota_ap","type":"quota_no"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.admin","request_id":"@req.quota_ap","seen_at":"<ts>"}},
+        {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.admin","request_id":"@req.quota_ap","seen_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "shipper_daily_report_save": {
+      "writes": [
+        {"table":"daily_reports","op":"upsert","match":null,"payload":{"blockers":"شركة الشحن متأخرة","day":"<today>","member_id":"@member.shipper","note":"جهزت شحنات خارج النظام","tasks":{"shipper_1":true},"updated_at":"<ts>"}},
+        {"table":"daily_reports","op":"upsert","match":null,"payload":{"blockers":"شركة الشحن متأخرة","day":"<today>","member_id":"@member.shipper","note":"جهزت شحنات خارج النظام","tasks":{"shipper_0":true,"shipper_1":true},"updated_at":"<ts>"}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_quotas_save": {
+      "writes": [
+        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.beta","member_id":"@member.creator","quota":4,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.creator2","quota":5,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.approver","quota":0,"updated_by":"@member.admin"}]},
+        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.beta","member_id":"@member.creator","quota":4,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.creator2","quota":3,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.approver","quota":3,"updated_by":"@member.admin"}]}
+      ],
+      "exports": [
+      ]
+    },
+    "approver_quotas_save": {
+      "writes": [
+        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.alpha","member_id":"@member.creator","quota":17,"updated_by":"@member.approver"},{"campaign_id":"@camp.alpha","member_id":"@member.creator2","quota":8,"updated_by":"@member.approver"}]}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_campaign_create": {
+      "writes": [
+        {"table":"campaigns","op":"insert","match":null,"payload":{"active":true,"name":"حملة تجريبية جديدة","product":"منتج تجريبي","status":"active","target_total":15}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_campaign_edit": {
+      "writes": [
+        {"table":"campaigns","op":"update","match":{"id":"@camp.beta"},"payload":{"active":true,"name":"حملة باء (معدّلة)","product":"بكج باء 2","status":"paused","target_total":12}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_sla_save": {
+      "writes": [
+        {"table":"settings","op":"upsert","match":null,"payload":{"key":"sla","value":{"appr":3,"intake":3,"live":2,"nom":3,"ship":5,"video":10}}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_member_activate_and_roles": {
+      "writes": [
+        {"table":"members","op":"update","match":{"id":"@member.pending"},"payload":{"active":true,"is_admin":false,"name":"عضو مفعّل","roles":["creator","design"]}},
+        {"table":"members","op":"update","match":{"id":"@member.shipper"},"payload":{"active":true,"is_admin":true,"name":"موظف الشحن","roles":["media"]}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_kpi_settings_save": {
+      "writes": [
+        {"table":"settings","op":"upsert","match":null,"payload":{"key":"kpi","value":{"capacity":{"@member.creator":40},"cost_median":1500}}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_daily_tasks_save": {
+      "writes": [
+        {"table":"settings","op":"upsert","match":null,"payload":{"key":"daily_tasks","value":{"design":["مراجعة الطلبات","تسليم التصاميم"],"shipper":["مراجعة الشحنات الجديدة","متابعة المتعذر"],"social":["نشر","ردود 10:00","ردود 14:00"]}}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_bank_keys_generate": {
+      "writes": [
+        {"table":"settings","op":"upsert","match":null,"payload":{"key":"bank_pub","value":{"alg":"RSA-OAEP-256","e":"AQAB","ext":true,"key_ops":["encrypt"],"kty":"RSA","n":"<blob>"}}}
+      ],
+      "exports": [
+      ]
+    },
+    "admin_export_dashboard_xlsx": {
+      "writes": [
+      ],
+      "exports": [
+        {"file":"أداء فريق العز <today>.xlsx","sheets":["الحملات","ترشيحات الحملات","المؤثرين والاستقطاب","الطلبات","سجل الطلبات","تقارير اليوم","بطاقة الأداء"],"rows":{"الحملات":4,"ترشيحات الحملات":33,"المؤثرين والاستقطاب":42,"الطلبات":9,"سجل الطلبات":17,"تقارير اليوم":4,"بطاقة الأداء":3},"columns":{"الحملات":["الحملة","الحالة","المطلوب","موزّع","انرسل","معتمد","مرفوض","استلموا","نشروا"],"ترشيحات الحملات":["المؤثر","اليوزر","الجوال","الحملة","صانع المحتوى","نوع المحتوى","نوع الإعلان","المنصات","المبلغ","العملة","المرحلة","سبب القرار","الإرسال للاعتماد","الاعتماد","المدينة","الحي والرمز","الشحن","شركة الشحن","رقم البوليصة","الوصول","تعذّر التسليم","نزل تيك توك","كود تيك توك","نزل سناب","يوزر سناب","نزل انستقرام","كود انستقرام","تشغيل تيك توك","تشغيل سناب","تشغيل انستقرام","الهوك","اعتماد الدفع","الدفع"],"المؤثرين والاستقطاب":["المعلن","بالإنجليزي","اليوزر","رابط تيك توك","نوع الحساب","حالة الحساب","المرشِّح","تاريخ الترشيح","المصدر","حالة الاستقطاب","سبب القرار","محاولات التواصل","آخر نتيجة","واجه مشكلة","المشكلة","المنصات","سناب","انستقرام","الجوال","الدولة","المدينة","الحي والرمز","قبل التفاوض","بعد التفاوض","العملة","تم الاتفاق"],"الطلبات":["النوع","العنوان","من","إلى","الموعد","الحالة","جولات التعديل","تاريخ الطلب","تاريخ التسليم","التسليم"],"سجل الطلبات":["التاريخ والوقت (الرياض)","الطلب","الشخص","الحدث","التفاصيل"],"تقارير اليوم":["التاريخ","الشخص","مهام يومية منجزة","من أصل","شغل غير مسجّل","المعوّقات","آخر حفظ (الرياض)"],"بطاقة الأداء":["الصانع","الشهر","الدرجة من 60","النسبة ٪","أوزان لها بيانات","المقاطع المنشورة","المقاطع المنشورة (المستوى)","الإشغال","الإشغال (المستوى)","الحملات المُدارة","الحملات المُدارة (المستوى)","نسبة الإنجاز","نسبة الإنجاز (المستوى)","سرعة النشر","سرعة النشر (المستوى)","النشر خلال أسبوع","النشر خلال أسبوع (المستوى)","المتأخرين","المتأخرين (المستوى)","تكلفة المقطع المدفوع","تكلفة المقطع المدفوع (المستوى)","البلوجر الجدد","البلوجر الجدد (المستوى)","التزام التصنيف","التزام التصنيف (المستوى)","جودة البيانات","جودة البيانات (المستوى)"]},"digest":{"الحملات":"f20fec7c","ترشيحات الحملات":"46ba8425","المؤثرين والاستقطاب":"a5ce2c83","الطلبات":"8c8a810f","سجل الطلبات":"7bbbe782","تقارير اليوم":"50a4adbc","بطاقة الأداء":"f25a409c"}},
+        {"file":"أداء فريق العز <today>.xlsx","sheets":["الحملات","ترشيحات الحملات","المؤثرين والاستقطاب","الطلبات","سجل الطلبات","تقارير اليوم","بطاقة الأداء"],"rows":{"الحملات":4,"ترشيحات الحملات":33,"المؤثرين والاستقطاب":42,"الطلبات":9,"سجل الطلبات":17,"تقارير اليوم":4,"بطاقة الأداء":3},"columns":{"الحملات":["الحملة","الحالة","المطلوب","موزّع","انرسل","معتمد","مرفوض","استلموا","نشروا"],"ترشيحات الحملات":["المؤثر","اليوزر","الجوال","الحملة","صانع المحتوى","نوع المحتوى","نوع الإعلان","المنصات","المبلغ","العملة","المرحلة","سبب القرار","الإرسال للاعتماد","الاعتماد","المدينة","الحي والرمز","الشحن","شركة الشحن","رقم البوليصة","الوصول","تعذّر التسليم","نزل تيك توك","كود تيك توك","نزل سناب","يوزر سناب","نزل انستقرام","كود انستقرام","تشغيل تيك توك","تشغيل سناب","تشغيل انستقرام","الهوك","اعتماد الدفع","الدفع"],"المؤثرين والاستقطاب":["المعلن","بالإنجليزي","اليوزر","رابط تيك توك","نوع الحساب","حالة الحساب","المرشِّح","تاريخ الترشيح","المصدر","حالة الاستقطاب","سبب القرار","محاولات التواصل","آخر نتيجة","واجه مشكلة","المشكلة","المنصات","سناب","انستقرام","الجوال","الدولة","المدينة","الحي والرمز","قبل التفاوض","بعد التفاوض","العملة","تم الاتفاق"],"الطلبات":["النوع","العنوان","من","إلى","الموعد","الحالة","جولات التعديل","تاريخ الطلب","تاريخ التسليم","التسليم"],"سجل الطلبات":["التاريخ والوقت (الرياض)","الطلب","الشخص","الحدث","التفاصيل"],"تقارير اليوم":["التاريخ","الشخص","مهام يومية منجزة","من أصل","شغل غير مسجّل","المعوّقات","آخر حفظ (الرياض)"],"بطاقة الأداء":["الصانع","الشهر","الدرجة من 60","النسبة ٪","أوزان لها بيانات","المقاطع المنشورة","المقاطع المنشورة (المستوى)","الإشغال","الإشغال (المستوى)","الحملات المُدارة","الحملات المُدارة (المستوى)","نسبة الإنجاز","نسبة الإنجاز (المستوى)","سرعة النشر","سرعة النشر (المستوى)","النشر خلال أسبوع","النشر خلال أسبوع (المستوى)","المتأخرين","المتأخرين (المستوى)","تكلفة المقطع المدفوع","تكلفة المقطع المدفوع (المستوى)","البلوجر الجدد","البلوجر الجدد (المستوى)","التزام التصنيف","التزام التصنيف (المستوى)","جودة البيانات","جودة البيانات (المستوى)"]},"digest":{"الحملات":"f20fec7c","ترشيحات الحملات":"46ba8425","المؤثرين والاستقطاب":"a5ce2c83","الطلبات":"8c8a810f","سجل الطلبات":"7bbbe782","تقارير اليوم":"50a4adbc","بطاقة الأداء":"5c604d57"}}
+      ]
+    },
+    "shipper_export_shipping_sheets": {
+      "writes": [
+      ],
+      "exports": [
+        {"file":"كشف الشحن <today>.xlsx","sheets":["كشف الشحن"],"rows":{"كشف الشحن":5},"columns":{"كشف الشحن":["م","الحالة","المؤثر","اسم المستلم","جوال المستلم","الدولة","المدينة","الحي والرمز المختصر","الحملة","المنتج","صانع المحتوى","تاريخ الاعتماد","تاريخ الشحن","شركة الشحن","رقم البوليصة","ملاحظة الشحن"]},"digest":{"كشف الشحن":"b7bad471"}},
+        {"file":"كشف سلاسل <today>.xlsx","sheets":["ALEZZ"],"rows":{"ALEZZ":2},"columns":{"ALEZZ":["orderNum","Shipping_Method","phone","name","address","city","state","zip","country","cod","sku","QTY"]},"digest":{"ALEZZ":"1459aebe"}}
+      ]
+    },
+    "admin_export_pay_sheet": {
+      "writes": [
+      ],
+      "exports": [
+        {"file":"كشف الدفع <today>.xlsx","sheets":["كشف الدفع"],"rows":{"كشف الدفع":6},"columns":{"كشف الدفع":["م","الحالة","المؤثر","اليوزر","جوال المؤثر","الحملة","صانع المحتوى","المنصات","المبلغ","العملة","نزل المحتوى","اعتماد الدفع","ملاحظات"]},"digest":{"كشف الدفع":"ef05c929"}}
+      ]
+    },
+    "snap_export_tracker_sheet": {
+      "writes": [
+      ],
+      "exports": [
+        {"file":"شيت التشغيل <today>.xlsx","sheets":["شيت التشغيل"],"rows":{"شيت التشغيل":8},"columns":{"شيت التشغيل":["اسم المنتج أو العرض","صانع المحتوى","اسم صانع المحتوى بالإنجليزي","Content Type","تصنيف صانع المحتوى","رابط الفيديو على السوشيال","الفيديو","TikTok | كود الترويج","Meta | كود الترويج","Snapchat | كود الترويج","كود الفيديو","تاريخ إضافة الفيديو"]},"digest":{"شيت التشغيل":"98a28fa1"}}
+      ]
+    },
+    "intake_submit_address": {
+      "writes": [
+        {"table":"intake_get","op":"rpc","match":null,"payload":{"p_token":"tok000000000000000000009"}},
+        {"table":"intake_submit","op":"rpc","match":null,"payload":{"p":{"address":"حي الرابط، شارع الاختبار","country":"السعودية","rcv_city":"جدة","rcv_name":"مستلم من الرابط","rcv_phone":"0559998877","short_code":"JJJD4321"},"p_cipher":null,"p_token":"tok000000000000000000009"}}
+      ],
+      "exports": [
+      ]
+    },
+    "intake_resubmit_already_filled": {
+      "writes": [
+        {"table":"intake_get","op":"rpc","match":null,"payload":{"p_token":"tok000000000000000000012"}},
+        {"table":"intake_submit","op":"rpc","match":null,"payload":{"p":{"address":"حي معدّل","country":"الإمارات","rcv_city":"دبي","rcv_name":"مستلم معدّل","rcv_phone":"+971501234567","short_code":""},"p_cipher":null,"p_token":"tok000000000000000000012"}}
+      ],
+      "exports": [
+      ]
+    },
+    "intake_bad_token": {
+      "writes": [
+        {"table":"intake_get","op":"rpc","match":null,"payload":{"p_token":"not-a-token"}}
+      ],
+      "exports": [
+      ]
+    },
+    "auth_sign_in_then_out": {
+      "writes": [
+        {"table":"auth","op":"signInWithPassword","match":null,"payload":{"email":"nobody@smoke.test"}},
+        {"table":"auth","op":"signInWithPassword","match":null,"payload":{"email":"creator@smoke.test"}},
+        {"table":"auth","op":"signOut","match":null,"payload":null}
+      ],
+      "exports": [
+      ]
+    },
+    "auth_sign_up_and_resend": {
+      "writes": [
+        {"table":"auth","op":"signUp","match":null,"payload":{"email":"new@smoke.test","name":"مسجّل جديد"}},
+        {"table":"auth","op":"resend","match":null,"payload":{"email":"new@smoke.test","type":"signup"}}
+      ],
+      "exports": [
+      ]
+    },
+    "readonly_admin_browsing": {
+      "writes": [
+      ],
+      "exports": [
+      ]
+    }
+  }
+}
