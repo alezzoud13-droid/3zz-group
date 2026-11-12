@@ -681,12 +681,21 @@ function dealRow(x, bulk, k) {
   const { d, i, p } = x; const late = lateness(d, i); const age = p ? ageOf(d[p + '_at']) : stepAge(d, i);
   const miss = k === 'post' ? platKeys(d).filter(q => !delivered(d, q)).map(q => 'باقي ' + PL[q]).join('، ') : '';
   const sub = [camp(d.campaign_id).name || 'بدون حملة', d.member_id !== S.me.id ? memName(d.member_id) : '', p ? PL[p] + (p === 'sn' ? (d.sn_user ? ' · ' + d.sn_user : '') : (d[p + '_code'] ? ' · ' + d[p + '_code'] : '')) : platText(platKeys(d)), miss, d.decision_reason && d.decision_reason.trim() && k === 'camp_fix' ? 'المطلوب: ' + d.decision_reason : '', k === 'video_fix' && (d.draft_feedback || '').trim() ? 'المطلوب: ' + d.draft_feedback : '', d.price != null ? fmt(d.price) + ' ' + (d.currency || '') : ''].filter(Boolean).join(' · ');
-  const apprBtns = k === 'appr' ? `<button class="btn sm danger" data-dq="reject" data-id="${d.id}" type="button">رفض</button><button class="btn sm" data-dq="needs_edit" data-id="${d.id}" type="button">تعديل</button>` : '';
+  const apprBtns = k === 'appr' ? `<button class="btn sm" data-dq="needs_edit" data-id="${d.id}" type="button">تعديل</button><button class="btn sm danger" data-dq="reject" data-id="${d.id}" type="button">رفض</button>` : '';
   const au = (k === 'appr' || k === 'draft') ? acctUrls(d, infl(d.influencer_id))[0] : null; const acctBtn = au ? `<a class="btn sm" href="${esc(au[1])}" target="_blank" rel="noopener">الحساب ↗</a>` : '';
-  const launchBtn = (k === 'launch' || k === 'snap_follow') ? `<button class="btn sm good" data-launch="${p}" data-id="${d.id}" type="button">انطلق</button>` : '';
-  return `<div class="qrow ${late}">${bulk ? `<input type="checkbox" data-bulk="${d.id}" aria-label="تحديد">` : '<span></span>'}<div><div class="t">${esc(d.name)}</div><div class="sub">${esc(sub)}</div></div><div class="acts row" style="gap:6px;flex-wrap:nowrap">${acctBtn}${apprBtns}${launchBtn}<span class="pill ${late === 'late' ? 'bad' : late === 'soon' ? 'warn' : ''}">${age} يوم</span><button class="btn sm" data-open="${d.id}" type="button">افتح</button></div></div>`;
+  const isLaunch = k === 'launch' || k === 'snap_follow', openBtn = `<button class="btn sm" data-open="${d.id}" type="button">افتح</button>`;
+  /* الإجراء الأساسي: الاعتماد الفردي مباشر، «انطلق» مباشر، والباقي يفتح الملف على خطوته */
+  const go = k === 'appr' ? `<button class="btn sm go" data-ap1="${d.id}" type="button">اعتماد</button>`
+    : isLaunch ? `<button class="btn sm go" data-launch="${p}" data-id="${d.id}" type="button">انطلق</button>`
+    : `<button class="btn sm go" data-open="${d.id}" type="button">${GO_LABEL[k] || 'افتح'}</button>`;
+  const more = acctBtn + apprBtns + (k === 'appr' || isLaunch ? openBtn : '');
+  const ageTag = late === 'late' ? `<span class="pill bad">متأخر · ${dayWord(age)}</span>` : late === 'soon' ? '<span class="pill warn">آخر يوم في المدة</span>' : `<span class="age">${dayWord(age)}</span>`;
+  return `<div class="qrow ${late}">${bulk ? `<input type="checkbox" data-bulk="${d.id}" aria-label="تحديد ${esc(d.name)}">` : '<span></span>'}<div><div class="t">${esc(d.name)}</div><div class="sub">${esc(sub)}</div></div><div class="acts">${ageTag}${go}${moreWrap(more, d.name)}</div></div>`;
 }
-function inflRow(i) { return `<div class="qrow"><span></span><div><div class="t">${esc(i.name)}</div><div class="sub">${esc([i.acc_type, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by), i.acq_reason && i.acq_reason.trim() ? 'المطلوب: ' + i.acq_reason : ''].filter(Boolean).join(' · '))}</div></div><div class="acts row" style="gap:6px">${acctUrls(null, i)[0] ? `<a class="btn sm" href="${esc(acctUrls(null, i)[0][1])}" target="_blank" rel="noopener">الحساب ↗</a>` : ''}<span class="pill">${ageOf(i.acq_sent_at || i.created_at)} يوم</span><button class="btn sm" data-openinfl="${i.id}" type="button">افتح</button></div></div>`; }
+const GO_LABEL = { camp_fix: 'عدّل الترشيح', camp_draft: 'كمّل الترشيح', intake: 'كمّل العنوان', video: 'أرسل المقطع الخام', video_fix: 'أعد إرسال المقطع', draft: 'راجع المقطع', post: 'سجّل النزول', ship_fail: 'تابع التسليم' };
+const dayWord = n => n <= 0 ? 'اليوم' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? n + ' أيام' : n + ' يوم';
+const moreWrap = (html, name) => html ? `<span class="morew"><button class="btn sm icon" data-more type="button" aria-haspopup="true" aria-expanded="false" aria-label="إجراءات أخرى: ${esc(name)}">⋯</button><span class="more">${html}</span></span>` : '';
+function inflRow(i) { return `<div class="qrow"><span></span><div><div class="t">${esc(i.name)}</div><div class="sub">${esc([i.acc_type, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by), i.acq_reason && i.acq_reason.trim() ? 'المطلوب: ' + i.acq_reason : ''].filter(Boolean).join(' · '))}</div></div><div class="acts"><span class="age">${dayWord(ageOf(i.acq_sent_at || i.created_at))}</span><button class="btn sm go" data-openinfl="${i.id}" type="button">افتح</button>${moreWrap(acctUrls(null, i)[0] ? `<a class="btn sm" href="${esc(acctUrls(null, i)[0][1])}" target="_blank" rel="noopener">الحساب ↗</a>` : '', i.name)}</div></div>`; }
 function renderMine() {
   const as = $('mineAs'); let id = S.me.id;
   if (isAdmin()) { const v = as.value || S.me.id; as.innerHTML = `<option value="${S.me.id}">أنا</option><option value="team">ملخص الفريق</option>` + active().filter(m => m.id !== S.me.id).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join(''); as.value = [...as.options].some(o => o.value === v) ? v : S.me.id; id = as.value; }
@@ -695,8 +704,21 @@ function renderMine() {
   const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
   $('mineTitle').textContent = id === S.me.id ? 'مهامي' : 'مهام ' + memName(id);
   $('mineSub').textContent = total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : 'ما عندك شي معلّق.';
-  $('mineBody').innerHTML = QO.filter(k => G[k] && G[k].length).map(k => {
-    const L = G[k], b = BULK[k]; const lateN = L.filter(x => x.d && lateness(x.d, x.i) === 'late').length;
+  /* عرض فقط: نفس القوائم ونفس العدّ، مرتبة في أقسام، مع تصفية بالمتأخر وآخر يوم */
+  const isLate = x => (x.d && lateness(x.d, x.i) === 'late') || (x.r && x.r.due && x.r.due < today()), isSoon = x => !!(x.d && lateness(x.d, x.i) === 'soon');
+  const counted = QO.filter(k => G[k] && !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).flatMap(k => G[k].map(x => ({ ...x, k })));
+  const nLate = counted.filter(isLate).length, nSoon = counted.filter(isSoon).length, f = ['late', 'soon'].includes(S.mineF) ? S.mineF : 'all';
+  const keep = x => f === 'all' || (f === 'late' ? isLate(x) : isSoon(x));
+  const stat = (key, n, label, cls) => `<button class="mstat ${cls}" type="button" data-mf="${key}" aria-pressed="${f === key}"><b>${n}</b>${label}</button>`;
+  const bar = total ? `<div class="mbar" role="group" aria-label="ملخص المهام">${stat('all', total, 'تنتظر خطوة', '')}${stat('late', nLate, 'متأخرة', nLate ? 'bad' : '')}${stat('soon', nSoon, 'آخر يوم', nSoon ? 'warn' : '')}</div>` : '';
+  const top = f === 'all' ? counted.filter(x => x.d && lateness(x.d, x.i) === 'late').sort((a, b) => stepAge(b.d, b.i) - stepAge(a.d, a.i)).slice(0, 3) : [];
+  const start = top.length ? `<h3 class="msec">ابدأ من هنا<small>الأكثر تأخيراً أول. نفس المهام موجودة في قوائمها تحت</small></h3><div class="panel" data-top><div style="display:grid;gap:8px">${top.map(x => dealRow(x, false, x.k)).join('')}</div></div>` : '';
+  const SEC = [['يحتاج قرارك', ['members', 'acq_review', 'appr', 'quota_req', 'draft', 'pay', 'req_review']], ['رجع لك للتعديل', ['req_fix', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail']], ['شغلك الحين', null], ['مسودات وحصص واحتياط', ['camp_quota', 'acq_draft', 'camp_draft', 'park']]];
+  const secOf = k => { const i = SEC.findIndex(([, ks]) => ks && ks.includes(k)); return i < 0 ? 2 : i; };
+  let lastSec = -1;
+  $('mineBody').innerHTML = bar + start + (QO.filter(k => G[k] && G[k].some(keep)).sort((a, b) => secOf(a) - secOf(b)).map(k => {
+    const L = G[k].filter(keep), b = BULK[k]; const lateN = L.filter(x => x.d && lateness(x.d, x.i) === 'late').length;
+    const head = secOf(k) !== lastSec ? `<h3 class="msec">${SEC[lastSec = secOf(k)][0]}</h3>` : '';
     const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay' || k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع Excel</button>' : ''}${k === 'snap_follow' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
@@ -705,8 +727,8 @@ function renderMine() {
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }
     else rows = L.map(x => dealRow(x, !!b, k)).join('');
-    return `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b || xb ? `<span style="margin-inline-start:auto" class="row">${xb}${b ? `<label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button>` : ''}</span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
-  }).join('') || '<div class="empty">ما عندك شي معلّق الحين. ابدأ من «+ ترشيح» أو اطلب شي من زميل من «+ طلب».</div>';
+    return head + `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b || xb ? `<span style="margin-inline-start:auto" class="row">${xb}${b ? `<label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button>` : ''}</span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
+  }).join('') || (f === 'all' ? '<div class="empty">ما عندك شي معلّق الحين. ابدأ من «+ ترشيح» أو اطلب شي من زميل من «+ طلب».</div>' : '<div class="empty">ما فيه مهام بهذي التصفية. اضغط «تنتظر خطوة» عشان ترجع كل مهامك.</div>'));
 }
 function renderTeam() {
   $('mineTitle').textContent = 'ملخص الفريق'; $('mineSub').textContent = 'كم شي ينتظر كل شخص، وكم منه متأخر.';
@@ -724,6 +746,12 @@ $('mineBody').addEventListener('click', async e => {
   const rq = e.target.closest('[data-req]'); if (rq) return openReq(rq.dataset.req);
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
   const as = e.target.closest('[data-as]'); if (as) { $('mineAs').value = as.dataset.as; return renderMine(); }
+  const mf = e.target.closest('[data-mf]'); if (mf) { S.mineF = S.mineF === mf.dataset.mf ? 'all' : mf.dataset.mf; return renderMine(); }
+  const a1 = e.target.closest('[data-ap1]'); if (a1) { if (a1.disabled) return; const d = S.deals.find(x => x.id === a1.dataset.ap1); if (!d) return;
+    const lbl = a1.textContent; a1.disabled = true; a1.setAttribute('aria-busy', 'true'); a1.textContent = 'جاري الحفظ…';
+    const r = await saveDeal(d.id, BULK.appr[1](d));
+    if (r) { toast('تم اعتماد ' + d.name); render(); } else if (document.contains(a1)) { a1.disabled = false; a1.removeAttribute('aria-busy'); a1.textContent = lbl; }
+    return; }
   const dq = e.target.closest('[data-dq]'); if (dq) { const d = S.deals.find(x => x.id === dq.dataset.id); if (d && await decideDeal(d, dq.dataset.dq)) { toast('انحفظ القرار'); render(); } return; }
   const ln = e.target.closest('[data-launch]'); if (ln) { const d = S.deals.find(x => x.id === ln.dataset.id); ln.disabled = true; if (d && await launchPlat(d, ln.dataset.launch)) { toast('انسجّل التشغيل'); render(); } return; }
   const all = e.target.closest('[data-all]'); if (all) { all.closest('[data-g]').querySelectorAll('[data-bulk]').forEach(c => c.checked = all.checked); return; }
@@ -871,6 +899,8 @@ function openDeal(id) {
       else ch = A[a]();
       if (!ch) return;
       if (a === 'close' && !await confirmBox('تأكيد إغلاق الملف؟')) return;
+      if (a === 'shipped' && !d.shipped_at && !await confirmBox(`تسجّل إن شحنة ${d.name} انشحنت اليوم؟`)) return;
+      if (a === 'delivered' && !d.delivered_at && !await confirmBox(`تسجّل إن شحنة ${d.name} وصلت اليوم؟`)) return;
       b.disabled = true; const r = await saveDeal(d.id, ch); b.disabled = false;
       if (r) {
         const AM = {

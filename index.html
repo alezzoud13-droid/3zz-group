@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>أداء فريق العز</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="assets/style.css?v=20261112f">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/ui.css?v=20261112r1">
 </head>
 <body>
 
@@ -35,27 +35,34 @@
 </section>
 
 <div id="appView" hidden>
-<header class="top"><div class="top-in">
-  <div class="brand">
-    <h1>أداء فريق العز</h1>
-    <div class="who">
-      <button class="newbtn" id="newDeal" type="button">+ ترشيح</button>
-      <button class="newbtn" id="newReq" type="button">+ طلب</button>
-      <button class="linkbtn" id="howBtn" type="button">كيف يمشي الشغل؟</button>
-      <span id="whoName"></span>
-      <button class="linkbtn" id="signOut" type="button">خروج</button>
-    </div>
-  </div>
-  <nav class="tabs" id="tabs">
-    <a href="#mine" data-v="mine">مهامي<span class="cnt" id="mineCnt" hidden></span></a>
-    <a href="#acq" data-v="acq">الاستقطاب</a>
-    <a href="#camps" data-v="camps">الحملات</a>
-    <a href="#pipe" data-v="pipe">خط الإنتاج</a>
-    <a href="#req" data-v="req">الطلبات<span class="cnt" id="reqCnt" hidden></span></a>
-    <a href="#today" data-v="today">تقرير اليوم</a>
-    <a href="#dash" data-v="dash" class="adm">لوحة الأداء</a>
-    <a href="#setup" data-v="setup" class="adm">الإعدادات</a>
+<div class="app" id="app">
+<aside class="side" id="side" aria-label="القائمة الرئيسية">
+  <div class="brand"><span class="mark" aria-hidden="true">ع</span><div class="bname"><h1>أداء فريق العز</h1><small>قسم التسويق</small></div>
+    <button class="sbtn" id="sideMini" type="button" aria-pressed="false" aria-label="صغّر القائمة" title="صغّر القائمة">⇥</button>
+    <button class="sbtn" id="sideClose" type="button" aria-label="إغلاق القائمة">✕</button></div>
+  <nav class="tabs" id="tabs" aria-label="صفحات النظام">
+    <span class="navlabel">الشغل اليومي</span>
+    <a href="#mine" data-v="mine"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="lbl">مهامي</span><span class="cnt" id="mineCnt" hidden></span></a>
+    <a href="#acq" data-v="acq"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zM4 20c1-4 4-6 8-6s7 2 8 6"/></svg><span class="lbl">الاستقطاب</span></a>
+    <a href="#camps" data-v="camps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4l10 4V6L4 10zM18 9a4 4 0 010 6"/></svg><span class="lbl">الحملات</span></a>
+    <a href="#pipe" data-v="pipe"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h4v14H4zM10 5h4v9h-4zM16 5h4v5h-4z"/></svg><span class="lbl">خط الإنتاج</span></a>
+    <a href="#req" data-v="req"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5z"/></svg><span class="lbl">الطلبات</span><span class="cnt" id="reqCnt" hidden></span></a>
+    <a href="#today" data-v="today"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v15H5zM5 9h14M9 3v4M15 3v4"/></svg><span class="lbl">تقرير اليوم</span></a>
+    <span class="navlabel adm">الإدارة</span>
+    <a href="#dash" data-v="dash" class="adm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span class="lbl">لوحة الأداء</span></a>
+    <a href="#setup" data-v="setup" class="adm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 100-6 3 3 0 000 6zM12 3v3M12 18v3M3 12h3M18 12h3"/></svg><span class="lbl">الإعدادات</span></a>
   </nav>
+  <div class="me"><span class="avatar" id="meAv" aria-hidden="true"></span><span id="whoName"></span><button class="sbtn" id="signOut" type="button" aria-label="خروج" title="خروج">⏻</button></div>
+</aside>
+<div class="shade" id="shade" hidden></div>
+<div class="mainw" id="mainEl">
+<header class="top"><div class="top-in">
+  <button class="btn icon menu" id="menu" type="button" aria-label="افتح القائمة" aria-controls="side" aria-expanded="false">☰</button>
+  <div class="who">
+    <button class="linkbtn" id="howBtn" type="button">كيف يمشي الشغل؟</button>
+    <button class="newbtn alt" id="newReq" type="button">+ طلب</button>
+    <button class="newbtn" id="newDeal" type="button">+ ترشيح</button>
+  </div>
 </div></header>
 
 <main>
@@ -145,6 +152,7 @@
     <div class="panel"><h2>البيانات البنكية</h2><div id="sBank"></div></div>
   </section>
 </main>
+</div></div>
 </div>
 
 <datalist id="dlCountries"><option>السعودية</option><option>الإمارات</option><option>الكويت</option><option>قطر</option><option>البحرين</option><option>عُمان</option><option>مصر</option><option>الأردن</option><option>العراق</option><option>لبنان</option><option>المغرب</option><option>الجزائر</option><option>تونس</option><option>تركيا</option><option>بريطانيا</option><option>أمريكا</option></datalist>
@@ -154,7 +162,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="assets/config.js?v=20261112f"></script>
-<script src="assets/app.js?v=20261112f"></script>
+<script src="assets/config.js?v=20261112r1"></script>
+<script src="assets/app.js?v=20261112r1"></script>
+<script src="assets/ui.js?v=20261112r1"></script>
 </body>
 </html>
