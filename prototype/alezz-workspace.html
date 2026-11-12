@@ -80,6 +80,11 @@ select,input[type=search]{height:var(--tap);border:1px solid var(--line);border-
 .btn.quiet{border-color:transparent;background:none;color:var(--muted)}
 .btn.icon{width:var(--tap);padding:0;font-size:18px;line-height:1}
 .btn.menu{display:none}
+.btn[disabled]{opacity:.6;cursor:default}
+.errline{font-size:var(--fs-sm);color:var(--danger);margin-top:2px}
+.dlgwrap{position:fixed;inset:0;z-index:10;display:grid;place-items:center;padding:var(--s4)}
+.dlg{position:relative;z-index:11;background:var(--surface);border-radius:var(--r);padding:var(--s5);width:min(400px,100%);display:grid;gap:var(--s3);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.dlg h2{font-size:var(--fs-lg)}.dlg p{color:var(--muted);font-size:var(--fs-sm)}
 
 /* سطر الأرقام والتصفية */
 .bar{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
@@ -206,8 +211,8 @@ const NAV2 = [['dash', 'لوحة الأداء'], ['setup', 'الإعدادات']
 const STEPS = ['الترشيح', 'الاعتماد', 'العنوان', 'الشحن', 'المقطع والنشر', 'التشغيل'];
 
 /* بيانات تجريبية للنموذج فقط. الأدوار الثلاثة هنا هي نفس صلاحيات النظام الحالية: موظف (صانع محتوى)، مشرف (المعتمد)، مدير (الأدمن). */
-const PEOPLE = { reem: ['ريم', 'صانع محتوى', 'موظف'], metab: ['متعب', 'معتمد + صانع محتوى', 'مشرف'], abdul: ['عبدالمحسن', 'مدير التسويق', 'مدير'] };
-/* go = الإجراء الأساسي: [النص، النوع] والنوع done ينفّذ مباشرة، open يفتح الملف على الخطوة المطلوبة. more = باقي الإجراءات الحالية داخل قائمة «⋯». */
+const PEOPLE = { reem: ['ريم', 'صانع محتوى', 'موظف'], saqr: ['صقر', 'صانع محتوى + شحن', 'موظف شحن'], metab: ['متعب', 'معتمد + صانع محتوى', 'مشرف'], abdul: ['عبدالمحسن', 'مدير التسويق', 'مدير'] };
+/* go = الإجراء الأساسي: [النص، النوع]. done = اعتماد روتيني: حفظ فوري بدون تأكيد. confirm = نافذة تأكيد مختصرة ثم حفظ. open يفتح الملف على الخطوة المطلوبة. more = باقي الإجراءات الحالية داخل قائمة «⋯». */
 const Q = {
   members: { t: 'حسابات جديدة تنتظر التفعيل', f: 'appr', step: -1, go: ['فعّله من الإعدادات', 'setup'], more: [] },
   pay: { t: 'تنتظر موافقتك على الدفع', f: 'appr', step: 4, go: ['اعتماد الدفع', 'done'], bulk: 'اعتماد الدفع', sheet: ['تنزيل كشف الدفع Excel'], more: [] },
@@ -219,14 +224,23 @@ const Q = {
   post: { t: 'المقطع معتمد: سجّل النزول والكود', f: 'video', step: 4, go: ['سجّل النزول', 'open'], more: [] },
   video: { t: 'وصله المنتج: أرسل المقطع الخام للمراجعة', f: 'video', step: 4, go: ['أرسل المقطع', 'open'], more: [] },
   intake: { t: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', f: 'ship', step: 2, go: ['كمّل العنوان', 'open'], more: [['wa', 'أرسل الرابط واتساب'], ['copy', 'نسخ رابط المؤثر']] },
+  ship_send: { t: 'جاهزة للشحن', f: 'ship', step: 3, go: ['تم الشحن', 'confirm'], bulk: 'تم الشحن اليوم', sheet: ['تنزيل كشف الشحن Excel', 'كشف سلاسل Excel'], more: [] },
+  ship_wait: { t: 'في الطريق: سجّل الوصول', f: 'ship', step: 3, go: ['وصلت', 'confirm'], bulk: 'وصلت اليوم', more: [] },
   req_in: { t: 'طلبات عليك', f: 'req', step: -1, go: ['بدأت فيه', 'done'], more: [] }
 };
+const CONFIRM = { ship_send: 'تتسجّل كمشحونة اليوم وتنتقل لقائمة «في الطريق».', ship_wait: 'يتسجّل وصول المنتج اليوم، ويبدأ احتساب مدة المقطع على صانع المحتوى.' };
 const SECTIONS = {
+  saqr: [['شغلك الحين', 'الشحن أول، ثم شغلك كصانع محتوى', ['ship_send', 'ship_wait', 'video_fix']]],
   reem: [['شغلك الحين', 'مرتّب بالأكثر تأخيراً', ['video_fix', 'intake', 'post', 'video', 'req_in']]],
   metab: [['ينتظر اعتمادك', 'شغل زملائك واقف على قرارك', ['appr', 'draft', 'acq_review', 'quota_req']], ['شغلك كصانع محتوى', '', ['video', 'post']]],
   abdul: [['يحتاج قرارك', 'اللي ما يمشي إلا بموافقتك', ['members', 'pay', 'appr']]]
 };
 const SEED = {
+  saqr: [
+    ['ship_send', 'نورة العتيبي', ['هيرش سيطرة', 'الرياض، الملقا', 'RRRD2929'], '', 8, 7], ['ship_send', 'ماجد السبيعي', ['هيرش سيطرة', 'جدة، الروضة', 'JEDA4410'], '', 2, 7], ['ship_send', 'أروى الغامدي', ['سطوة القرن منزلي', 'الدمام، الشاطئ'], '', 1, 7],
+    ['ship_wait', 'خالد البلوي', ['هيرش سيطرة', 'سمسا', 'بوليصة 5616848521'], '', 3, 7], ['ship_wait', 'جود العمري', ['سطوة القرن منزلي', 'أرامكس', 'بوليصة 4470012'], '', 7, 7],
+    ['video_fix', 'سارة المطيري', ['هيرش سيطرة', 'تيك توك', '800 ر.س'], 'المطلوب من متعب: الصوت منخفض في آخر المقطع', 2, 1]
+  ],
   reem: [
     ['video_fix', 'سارة المطيري', ['سطوة القرن منزلي', 'تيك توك', '800 ر.س'], 'المطلوب من متعب: الصوت منخفض في آخر المقطع', 2, 1],
     ['intake', 'يزيد الرشيد', ['سطوة القرن منزلي', 'تيك توك + سناب', '1,100 ر.س'], 'ما عبّى العنوان من 4 أيام', 4, 3],
@@ -258,7 +272,7 @@ const AUDIT = {
   setup: ['الإعدادات', 'الفريق والمدد والقوائم', ['تفعيل الأعضاء وتحديد الأدوار', 'المدة المسموحة لكل مرحلة', 'قوائم تقرير اليوم، إعدادات بطاقة الأداء، مفاتيح البنك'], ['تقسيم الصفحة لأقسام', 'تأكيد قبل أي تغيير في الأدوار']]
 };
 
-const S = { view: 'mine', who: 'metab', rows: {}, filter: 'all', q: '', mode: 'data', closed: {} };
+const S = { view: 'mine', who: 'metab', rows: {}, filter: 'all', q: '', mode: 'data', closed: {}, busy: new Set(), err: {}, fail: false };
 let uid = 0; for (const k in SEED) S.rows[k] = SEED[k].map(r => ({ id: ++uid, q: r[0], n: r[1], m: r[2], note: r[3], age: r[4], sla: r[5] }));
 const isMgr = () => S.who === 'abdul';
 const late = r => r.age > r.sla, soon = r => r.age === r.sla, over = r => r.age - r.sla;
@@ -276,15 +290,15 @@ function nav() {
 }
 const ageHtml = r => late(r) ? `<span class="b danger">متأخر ${days(over(r))}</span>` : soon(r) ? '<span class="b warn">آخر يوم في المدة</span>' : `<span class="age">${r.age ? `${days(r.age)} من ${r.sla}` : 'وصل اليوم'}</span>`;
 function rowHtml(r, bulk, withQueue) {
-  const q = Q[r.q], parts = r.m;
+  const q = Q[r.q], parts = r.m, busy = S.busy.has(r.id);
   const items = [['open', 'افتح الملف']].concat(q.more);
   return `<div class="row" data-id="${r.id}">${bulk ? `<label class="ck"><input type="checkbox" id="c${r.id}" aria-label="تحديد ${esc(r.n)}"></label>` : '<span></span>'}
-    <div><button class="t" type="button" data-act="open">${esc(r.n)}</button><div class="m">${withQueue ? `<span class="qn">${q.t} · </span>` : ''}${parts.map((p, i) => i === 0 ? `<b>${esc(p)}</b>` : esc(p)).join(' · ')}</div>${r.note ? `<div class="note">${esc(r.note)}</div>` : ''}</div>
+    <div><button class="t" type="button" data-act="open">${esc(r.n)}</button><div class="m">${withQueue ? `<span class="qn">${q.t} · </span>` : ''}${parts.map((p, i) => i === 0 ? `<b>${esc(p)}</b>` : esc(p)).join(' · ')}</div>${r.note ? `<div class="note">${esc(r.note)}</div>` : ''}${S.err[r.id] ? `<div class="errline" role="alert">${esc(S.err[r.id])}</div>` : ''}</div>
     <div class="st">${ageHtml(r)}</div>
-    <div class="a"><button class="btn act" type="button" data-act="go">${q.go[0]}</button><div class="more"><button class="btn icon quiet" type="button" data-more aria-haspopup="menu" aria-expanded="false" aria-label="إجراءات أخرى: ${esc(r.n)}">⋯</button><div class="pop" role="menu" hidden>${items.map(([a, l]) => `<button type="button" role="menuitem" class="${a === 'no' ? 'no' : ''}" data-act="${a}">${l}</button>`).join('')}</div></div></div></div>`;
+    <div class="a"><button class="btn act" type="button" data-act="go" ${busy ? 'disabled aria-busy="true"' : ''}>${busy ? 'جاري الحفظ…' : q.go[0]}</button><div class="more"><button class="btn icon quiet" type="button" data-more ${busy ? 'disabled' : ''} aria-haspopup="menu" aria-expanded="false" aria-label="إجراءات أخرى: ${esc(r.n)}">⋯</button><div class="pop" role="menu" hidden>${items.map(([a, l]) => `<button type="button" role="menuitem" class="${a === 'no' ? 'no' : ''}" data-act="${a}">${l}</button>`).join('')}</div></div></div></div>`;
 }
 function demoBar(note) {
-  return `<div class="demo"><span>${note || 'نموذج عرض ببيانات تجريبية، مو مربوط بالنظام.'}</span><label for="who">معاينة كدور<select id="who">${Object.entries(PEOPLE).map(([k, v]) => `<option value="${k}" ${k === S.who ? 'selected' : ''}>${v[2]}: ${v[0]}</option>`).join('')}</select></label>${note ? '' : `<label for="mode">حالة الصفحة<select id="mode">${[['data', 'فيها بيانات'], ['load', 'تحميل'], ['empty', 'فاضية'], ['err', 'خطأ']].map(([k, t]) => `<option value="${k}" ${S.mode === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>`}</div>`;
+  return `<div class="demo"><span>${note || 'نموذج عرض ببيانات تجريبية، مو مربوط بالنظام.'}</span><label for="who">معاينة كدور<select id="who">${Object.entries(PEOPLE).map(([k, v]) => `<option value="${k}" ${k === S.who ? 'selected' : ''}>${v[2]}: ${v[0]}</option>`).join('')}</select></label>${note ? '' : `<label for="mode">حالة الصفحة<select id="mode">${[['data', 'فيها بيانات'], ['load', 'تحميل'], ['empty', 'فاضية'], ['err', 'خطأ']].map(([k, t]) => `<option value="${k}" ${S.mode === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label><label for="fail">نتيجة الحفظ<select id="fail"><option value="">ينجح</option><option value="1" ${S.fail ? 'selected' : ''}>يفشل</option></select></label>`}</div>`;
 }
 function pageMine() {
   const all = mine(), nLate = all.filter(late).length, nSoon = all.filter(soon).length;
@@ -301,7 +315,7 @@ function pageMine() {
   const top = L.filter(late).sort((a, b) => over(b) - over(a)).slice(0, 3);
   const groupHtml = k => { const q = Q[k], R = L.filter(r => r.q === k).sort((a, b) => over(b) - over(a)); if (!R.length) return ''; const nl = R.filter(late).length, shut = S.closed[k];
     return `<section class="group" data-g="${k}"><div class="ghead"><button class="btn icon quiet" data-fold="${k}" type="button" aria-expanded="${!shut}" aria-label="${shut ? 'افتح' : 'اطوِ'} قائمة ${q.t}">${shut ? '‹' : '⌄'}</button><h3>${q.t}</h3><span class="c num">${R.length}</span>${nl ? `<span class="b danger">${nl} متأخر</span>` : ''}
-      <div class="tools">${(q.sheet || []).map(x => `<button class="btn" data-sheet type="button">${x}</button>`).join('')}${q.bulk && !shut ? `<label for="all_${k}"><input type="checkbox" id="all_${k}" data-all> الكل</label><button class="btn" data-bulk="${q.bulk}" type="button">${q.bulk} للمحدد</button>` : ''}</div></div>${shut ? '' : R.map(r => rowHtml(r, !!q.bulk)).join('')}</section>`; };
+      <div class="tools">${(q.sheet || []).map(x => `<button class="btn" data-sheet type="button">${x}</button>`).join('')}${q.bulk && !shut ? `<label for="all_${k}"><input type="checkbox" id="all_${k}" data-all> الكل</label><button class="btn" data-bulk="${q.bulk}" type="button" ${R.some(r => S.busy.has(r.id)) ? 'disabled aria-busy="true"' : ''}>${R.some(r => S.busy.has(r.id)) ? 'جاري الحفظ…' : q.bulk + ' للمحدد'}</button>` : ''}</div></div>${shut ? '' : R.map(r => rowHtml(r, !!q.bulk)).join('')}</section>`; };
   const secs = SECTIONS[S.who].map(([t, hint, qs]) => { const g = qs.map(groupHtml).join(''); return g ? `<div class="sechead"><h2>${t}</h2><span>${hint}</span></div>${g}` : ''; }).join('');
   const extra = S.who === 'reem' ? `<div class="sechead"><h2>حصصك وتقريرك</h2></div><div class="group"><div class="row"><span></span><div><div class="t" style="font-weight:600">سطوة القرن منزلي</div><div class="m">رشّحت 3 من حصتك 5، باقي لك 2</div></div><span class="st age">حصة ترشيح</span><div class="a"><button class="btn act" data-new="ترشيح" type="button">رشّح</button></div></div><div class="row"><span></span><div><div class="t" style="font-weight:600">تقرير اليوم</div><div class="m">ما انحفظ للحين. شغلك في النظام ينحسب لحاله</div></div><span class="st age">آخر الدوام</span><div class="a"><a class="btn" href="#today">اكتب التقرير</a></div></div></div>`
     : isMgr() ? `<div class="sechead"><h2>ملخص الفريق</h2><span>كم شي ينتظر كل شخص وكم منه متأخر</span></div><div class="tw"><table><thead><tr><th>الشخص</th><th>الدور</th><th class="n">ينتظر</th><th class="n">متأخر</th></tr></thead><tbody>${TEAM.map(([n, r, w, l]) => `<tr><td><b>${n}</b></td><td>${r}</td><td class="n">${w}</td><td class="n">${l ? `<span class="b danger">${l}</span>` : '0'}</td></tr>`).join('')}</tbody></table></div>
@@ -345,6 +359,26 @@ function openSheet(r, from) { const q = Q[r.q]; sheetFrom = from;
    <p style="color:var(--muted);font-size:var(--fs-sm)">في النسخة الفعلية تنفتح هنا كل أقسام الملف بنفس حقولها وأزرارها الحالية، على الخطوة المطلوبة منك.</p>`;
   $('sheet').hidden = false; $('sx').onclick = () => closeSheet(true); $('sx').focus();
 }
+/* الحفظ في النموذج يحاكي الخادم: الزر يتعطّل ويظهر «جاري الحفظ…»، والواجهة ما تتغير إلا بعد نجاح الرد. الفشل يبقي كل شي كما كان مع رسالة واضحة. */
+const fakeServer = () => new Promise(res => setTimeout(() => { window.__saves = (window.__saves || 0) + 1; res(!S.fail); }, window.__latency || 700));
+async function runSave(ids, label) {
+  const w = S.who; ids = ids.filter(id => !S.busy.has(id)); if (!ids.length) return;   /* منع الضغط المكرر */
+  ids.forEach(id => { S.busy.add(id); delete S.err[id]; }); render();
+  const saved = await fakeServer();
+  ids.forEach(id => S.busy.delete(id));
+  if (saved) { const one = S.rows[w].find(r => r.id === ids[0]); S.rows[w] = S.rows[w].filter(r => !ids.includes(r.id)); render(); return toast(`${label}: ${ids.length === 1 && one ? one.n : ids.length + ' ملفات'} (انحفظ)`); }
+  ids.forEach(id => S.err[id] = `ما انحفظ «${label}». تأكد من النت وجرّب مرة ثانية. المهمة باقية كما هي.`); render(); toast('ما انحفظ، وما تغيّر شي.');
+  const b = document.querySelector(`.row[data-id="${ids[0]}"] [data-act="go"]`); if (b) b.focus();
+}
+function confirmBox(title, text, onYes) {
+  const from = document.activeElement, d = document.createElement('div'); d.className = 'dlgwrap'; d.dir = 'rtl'; d.lang = 'ar';
+  d.innerHTML = `<div class="shade"></div><div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgP"><h2 id="dlgT">${esc(title)}</h2><p id="dlgP">${esc(text)}</p><div class="bar"><button class="btn primary" type="button" data-yes>تأكيد</button><button class="btn" type="button" data-no>إلغاء</button></div></div>`;
+  document.body.appendChild(d); $('app').inert = true;
+  const close = yes => { d.remove(); $('app').inert = false; if (yes) onYes(); else if (from && document.contains(from)) from.focus(); };
+  d.querySelector('[data-yes]').onclick = () => close(true); d.querySelector('[data-no]').onclick = d.querySelector('.shade').onclick = () => close(false);
+  d.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); close(false); } else if (e.key === 'Tab') { e.stopPropagation(); trap(d.querySelector('.dlg'), e); } });
+  d.querySelector('[data-no]').focus();
+}
 const REAL = { acct: 'يفتح حساب المؤثر في تبويب جديد', fix: 'يطلب وش المطلوب تعديله ثم يرجّعه لصاحبه', no: 'يطلب سبب الرفض ثم يحفظ', wa: 'يفتح واتساب برسالة فيها رابط المؤثر', copy: 'ينسخ رابط المؤثر' };
 
 document.addEventListener('click', e => {
@@ -362,14 +396,15 @@ document.addEventListener('click', e => {
   if (t.closest('[data-help]')) return toast('في النسخة الفعلية: ينفتح دليل الشغل حسب دورك');
   if (t.closest('[data-sheet]')) return toast('في النسخة الفعلية: ينزل ملف Excel على جهازك');
   const all = t.closest('[data-all]'); if (all) { all.closest('.group').querySelectorAll('.row input[type=checkbox]').forEach(c => c.checked = all.checked); return; }
-  const bulk = t.closest('[data-bulk]'); if (bulk) { const ids = [...bulk.closest('.group').querySelectorAll('.row input:checked')].map(c => +c.closest('.row').dataset.id); if (!ids.length) return toast('حدّد ملف واحد على الأقل'); S.rows[S.who] = mine().filter(r => !ids.includes(r.id)); render(); return toast(`${bulk.dataset.bulk}: ${ids.length} ملف (نموذج عرض، ما تغيّر شي في النظام)`); }
+  const bulk = t.closest('[data-bulk]'); if (bulk) { const ids = [...bulk.closest('.group').querySelectorAll('.row input:checked')].map(c => +c.closest('.row').dataset.id); if (!ids.length) return toast('حدّد ملف واحد على الأقل'); const k = bulk.closest('.group').dataset.g, go = () => runSave(ids, bulk.dataset.bulk); return Q[k].go[1] === 'confirm' ? confirmBox(`${bulk.dataset.bulk}: ${ids.length === 1 ? 'ملف واحد' : ids.length + ' ملفات'}`, CONFIRM[k], go) : go(); }
   const a = t.closest('[data-act]'); if (a) { const rowEl = a.closest('.row'), r = mine().find(x => x.id === +rowEl.dataset.id); if (!r) return; const act = a.dataset.act, q = Q[r.q]; const from = a.closest('.pop') ? rowEl.querySelector('[data-more]') : a; closePop(false);
     if (act === 'open' || (act === 'go' && q.go[1] === 'open')) return openSheet(r, from);
     if (act === 'go' && q.go[1] === 'setup') { location.hash = 'setup'; return; }
-    if (act === 'go') { S.rows[S.who] = mine().filter(x => x.id !== r.id); render(); return toast(`${q.go[0]}: ${r.n} (نموذج عرض، ما تغيّر شي في النظام)`); }
+    if (act === 'go') return q.go[1] === 'confirm' ? confirmBox(`${q.go[0]}: ${r.n}`, CONFIRM[r.q], () => runSave([r.id], q.go[0])) : runSave([r.id], q.go[0]);
     return toast('في النسخة الفعلية: ' + REAL[act]); }
 });
-document.addEventListener('change', e => { if (e.target.id === 'who') { S.who = e.target.value; S.filter = 'all'; S.q = ''; S.mode = 'data'; S.closed = {}; if (location.hash.slice(1) && location.hash !== '#mine') history.replaceState(null, '', '#mine'); route(); const w = $('who'); if (w) w.focus(); } if (e.target.id === 'mode') { S.mode = e.target.value; render(); const m = $('mode'); if (m) m.focus(); } });
+document.addEventListener('change', e => { if (e.target.id === 'who') { S.who = e.target.value; S.filter = 'all'; S.q = ''; S.mode = 'data'; S.closed = {}; S.busy.clear(); S.err = {}; if (location.hash.slice(1) && location.hash !== '#mine') history.replaceState(null, '', '#mine'); route(); const w = $('who'); if (w) w.focus(); } if (e.target.id === 'fail') S.fail = !!e.target.value;
+  if (e.target.id === 'mode') { S.mode = e.target.value; render(); const m = $('mode'); if (m) m.focus(); } });
 document.addEventListener('input', e => { if (e.target.id === 'q') { S.q = e.target.value; const p = e.target.selectionStart; pageMine(); const q = $('q'); if (q) { q.focus(); q.setSelectionRange(p, p); } } });
 document.addEventListener('keydown', e => {
   if (openPop) { const items = [...openPop.nextElementSibling.children], i = items.indexOf(document.activeElement);

@@ -18,7 +18,7 @@ const cr = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + .05) /
   let p = await open(1440, 900);
   ok(await p.$eval('#side', e => Math.round(e.getBoundingClientRect().width)) === 232, 'الشريط الجانبي الموسّع عرضه 232');
   ok(await p.$eval('#menu', e => getComputedStyle(e).display) === 'none', 'زر القائمة مخفي على اللابتوب');
-  for (const k of ['reem', 'metab', 'abdul']) { await who(p, k); ok(await overflow(p) === 0, `لابتوب: لا تمرير أفقي (${k})`); }
+  for (const k of ['reem', 'saqr', 'metab', 'abdul']) { await who(p, k); ok(await overflow(p) === 0, `لابتوب: لا تمرير أفقي (${k})`); }
   await who(p, 'metab'); await shot(p, 'v2_desktop');
   await who(p, 'metab');
   ok(await p.$eval('#nav2', e => e.hidden), 'المشرف: مجموعة الإدارة مخفية (مثل الصلاحيات الحالية)');
@@ -29,13 +29,37 @@ const cr = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + .05) /
   ok(await p.$eval('[data-g=appr] .row [data-more]', e => e.getAttribute('aria-expanded')) === 'true' && await p.evaluate(() => document.activeElement.getAttribute('role')) === 'menuitem', 'قائمة «⋯» تنفتح والتركيز على أول عنصر');
   await p.keyboard.press('ArrowDown'); ok(await p.evaluate(() => document.activeElement.innerText) === 'افتح حساب المؤثر ↗', 'السهم ينقل بين عناصر القائمة');
   await p.keyboard.press('Escape'); ok(await p.evaluate(() => document.activeElement.hasAttribute('data-more') && document.querySelectorAll('.pop:not([hidden])').length === 0), 'Esc يقفل القائمة ويرجّع التركيز لزرها');
-  await p.click('[data-g=appr] .row .btn.act'); ok(await p.$$eval('[data-g=appr] .row', e => e.length) === n0 - 1, 'الإجراء الأساسي «اعتماد» يشيل المهمة من القائمة');
-  await p.click('[data-g=appr] [data-all]'); await p.click('[data-g=appr] [data-bulk]'); ok(await p.$('[data-g=appr]') === null, 'الإجراء الجماعي للمحدد يشتغل');
+  /* الاعتماد الروتيني: حفظ فوري بدون تأكيد، حالة تحميل، منع التكرار، والواجهة تتحدث بعد النجاح فقط */
+  const go = '[data-g=appr] .row .btn.act', cnt = () => p.$$eval('[data-g=appr] .row', e => e.length);
+  await p.evaluate(() => { window.__latency = 400; window.__saves = 0; });
+  await p.click(go);
+  ok(await p.$('.dlg') === null, 'الاعتماد الروتيني بدون نافذة تأكيد');
+  ok(await p.$eval(go, e => e.disabled && e.getAttribute('aria-busy') === 'true' && e.innerText.includes('جاري الحفظ')) && await cnt() === n0, 'أثناء الحفظ: الزر معطّل وحالة تحميل، والقائمة ما تغيّرت قبل رد الخادم');
+  await p.click(go, { force: true, timeout: 500 }).catch(() => { }); await p.waitForTimeout(800);
+  ok(await p.evaluate(() => window.__saves) === 1, 'منع الضغط المكرر: طلب حفظ واحد فقط');
+  ok(await cnt() === n0 - 1, 'بعد نجاح الحفظ: المهمة تطلع من القائمة');
+  await p.selectOption('#fail', '1'); await p.click(go); await p.waitForTimeout(800);
+  ok(await cnt() === n0 - 1 && await p.$eval('[data-g=appr] .row .errline', e => e.getAttribute('role') === 'alert' && e.innerText.includes('ما انحفظ')) && await p.$eval(go, e => !e.disabled && e.innerText === 'اعتماد'), 'فشل الحفظ: المهمة والحالة كما كانت مع رسالة خطأ واضحة');
+  await p.selectOption('#fail', '');
+  await p.click('[data-g=appr] [data-all]'); await p.click('[data-g=appr] [data-bulk]');
+  ok(await p.$('.dlg') === null && await p.$eval('[data-g=appr] [data-bulk]', e => e.disabled), 'الاعتماد الجماعي: فوري بدون تأكيد مع حالة تحميل'); await p.waitForTimeout(800);
+  ok(await p.$('[data-g=appr]') === null, 'الاعتماد الجماعي: القائمة تتحدث بعد نجاح الحفظ');
+  ok(!(await p.$eval('body', e => e.innerText.includes('تراجع'))), 'لا يوجد تراجع ولا مؤقتات في أي مكان');
   await p.click('.row .t'); ok(await p.$eval('#sheet', e => !e.hidden) && await p.evaluate(() => document.activeElement.id) === 'sx', 'عنوان المهمة يفتح لوحة التفاصيل والتركيز داخلها');
   await p.keyboard.press('Escape'); ok(await p.$eval('#sheet', e => e.hidden) && await p.evaluate(() => document.activeElement.classList.contains('t')), 'Esc يقفل اللوحة ويرجّع التركيز');
   await p.goto(URL + '#dash'); await p.waitForTimeout(200); ok(await p.$eval('#pTitle', e => e.innerText) === 'مهامي', 'غير المدير ما يفتح لوحة الأداء');
   await who(p, 'abdul'); ok(!(await p.$eval('#nav2', e => e.hidden)) && await p.$('table') !== null, 'المدير: الإدارة ظاهرة وملخص الفريق موجود');
   await who(p, 'reem'); ok(await p.$eval('#page', e => e.innerText.includes('حصصك وتقريرك')) && await p.$eval('#nav2', e => e.hidden), 'الموظف: شغله وحصته وتقريره فقط');
+  /* تم الشحن / وصلت: نافذة تأكيد مختصرة ثم نفس آلية الحفظ */
+  await who(p, 'saqr'); await p.evaluate(() => { window.__saves = 0; });
+  const sgo = '[data-g=ship_send] .row .btn.act', sc = () => p.$$eval('[data-g=ship_send] .row', e => e.length), s0 = await sc();
+  await p.click(sgo);
+  ok(await p.$eval('.dlg', e => e.getAttribute('role') === 'alertdialog' && e.contains(document.activeElement)) && await p.evaluate(() => window.__saves) === 0, 'تم الشحن: نافذة تأكيد مختصرة والتركيز داخلها، وما ينحفظ شي قبل التأكيد');
+  await p.keyboard.press('Escape');
+  ok(await p.$('.dlg') === null && await sc() === s0 && await p.evaluate(() => window.__saves === 0 && document.activeElement.dataset.act === 'go'), 'إلغاء التأكيد: لا حفظ، والتركيز يرجع للزر');
+  await p.click(sgo); await p.click('.dlg [data-yes]'); ok(await p.$eval(sgo, e => e.disabled), 'بعد التأكيد: حالة تحميل'); await p.waitForTimeout(800);
+  ok(await sc() === s0 - 1 && await p.evaluate(() => window.__saves) === 1, 'بعد التأكيد ونجاح الحفظ: الشحنة تطلع من القائمة');
+  await p.click('[data-g=ship_wait] [data-all]'); await p.click('[data-g=ship_wait] [data-bulk]'); ok(await p.$('.dlg') !== null, 'وصلت اليوم (جماعي): نافذة تأكيد'); await p.click('.dlg [data-no]');
   for (const m of ['load', 'empty', 'err']) { await p.selectOption('#mode', m); await p.waitForTimeout(100); ok(await p.$eval('#page', (e, m) => m === 'load' ? !!e.querySelector('[aria-busy]') : !!e.querySelector('.state'), m), 'حالة الصفحة: ' + m); }
   await p.selectOption('#mode', 'data');
   await p.click('#sideMini'); await p.waitForTimeout(100);
@@ -49,7 +73,7 @@ const cr = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + .05) /
 
   /* ===== الجوال ===== */
   p = await open(390, 844);
-  for (const k of ['reem', 'abdul', 'metab']) { await who(p, k); ok(await overflow(p) === 0, `جوال: لا تمرير أفقي (${k})`); }
+  for (const k of ['reem', 'saqr', 'abdul', 'metab']) { await who(p, k); ok(await overflow(p) === 0, `جوال: لا تمرير أفقي (${k})`); }
   ok(await p.$eval('#side', e => getComputedStyle(e).visibility) === 'hidden', 'الدرج مقفول: مخفي وما ياخذ تركيز');
   await shot(p, 'v2_mobile_closed');
   const small = await p.$$eval('.page button, .page a.btn, .page select, .page input[type=search], .top button', E => E.filter(e => e.offsetParent !== null && !e.classList.contains('t') && e.getBoundingClientRect().height < 44).map(e => (e.innerText || e.id) + ':' + Math.round(e.getBoundingClientRect().height)));
