@@ -117,6 +117,10 @@
       <div class="row"><div class="field"><label for="dPeriod">الفترة</label><select id="dPeriod"><option value="month">هذا الشهر</option><option value="last">الشهر الماضي</option><option value="30">آخر 30 يوم</option><option value="all">الكل</option></select></div>
       <button class="btn primary" id="dXlsx" type="button" style="align-self:end">تنزيل Excel</button></div></div></div>
     <div class="tiles" id="dTiles"></div>
+    <div class="panel"><div class="row between"><div><h3>بطاقة الأداء الشهرية: صناع المحتوى</h3><div class="muted small" id="kSub"></div></div>
+      <div class="field"><label for="kMonth">الشهر</label><select id="kMonth"></select></div></div>
+      <div class="tw" id="kCard"></div>
+      <div class="note">المؤشرات الـ11 من إطار الأداء، تنحسب من شغل الموقع مباشرة. الرقم تحت اسم المؤشر هو وزنه، ومجموع الأوزان 60. لون كل خانة هو مستواها: أخضر = جيد جداً أو مثالي، أصفر = متوسط أو جيد، أحمر = منخفض أو دون المتوسط. «—» = ما فيه بيانات، فيُستبعد المؤشر وتنحسب النسبة على الباقي. «عيّنة صغيرة» = أقل من 5 مقاطع في الشهر، فالنسب ما يُحكم منها لحالها. اضغط على أي صف لتفاصيل الحساب.</div></div>
     <div class="panel"><h3>معوّقات كتبها الفريق وتحتاج تدخّل <span class="pill bad" id="dBlockN"></span></h3><div class="tw" id="dBlock"></div>
       <h3>الالتزام بتقرير اليوم</h3><div class="tw" id="dDaily"></div>
       <div class="note">«الالتزام» = أيام العمل اللي انكتب فيها تقرير ÷ أيام العمل في الفترة (الأحد إلى الخميس، لين أمس، ومن تاريخ انضمام الشخص). «إنجاز القائمة اليومية» = المهام اللي أشّر عليها ÷ مهام قائمته في التقارير اللي كتبها. الأقل التزاماً يطلع أول.</div>
@@ -136,6 +140,7 @@
     <div class="panel"><h2>الفريق والأدوار</h2><div class="muted small">كل شخص يسجّل من صفحة الدخول، وأنت تفعّله وتحدد دوره هنا. الدور يحدد وش يطلع له في «مهامي».</div><div class="tw" id="sMembers"></div></div>
     <div class="panel"><h2>المدة المسموحة لكل مرحلة (أيام)</h2><div class="grid3" id="sSla"></div><div><button class="btn primary" id="sSlaSave" type="button">حفظ المدد</button></div></div>
     <div class="panel"><h2>قائمة تقرير اليوم لكل دور</h2><div class="muted small">سطر لكل مهمة. صناع المحتوى ما يحتاجون قائمة لأن شغلهم ينحسب من خط الإنتاج.</div><div class="grid2" id="sTasks"></div><div><button class="btn primary" id="sTasksSave" type="button">حفظ القوائم</button></div></div>
+    <div class="panel"><h2>إعدادات بطاقة الأداء</h2><div class="muted small">السعة القياسية 80 وحدة بالشهر. الموظف في فترة التأهيل: 40 في شهره الأول ثم 60 ثم 80، ومعها ينخفض مستهدف المقاطع والحملات بنفس النسبة.</div><div class="grid3" id="sKpi"></div><div><button class="btn primary" id="sKpiSave" type="button">حفظ</button></div></div>
     <div class="panel"><h2>البيانات البنكية</h2><div id="sBank"></div></div>
   </section>
 </main>

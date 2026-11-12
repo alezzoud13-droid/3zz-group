@@ -77,7 +77,7 @@ const optsBlank = (list, sel, blank) => `<option value="">${blank || 'اختر'}
 
 /* ================= الحالة ================= */
 const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/');
-const S = { reads: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
+const S = { reads: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, kpi: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
 const mem = id => S.members.find(m => m.id === id);
 const memName = id => (mem(id) || {}).name || '—';
 const active = () => S.members.filter(m => m.active);
@@ -139,7 +139,7 @@ async function loadAll() {
     sb.from('request_reads').select('request_id,seen_at')
   ]);
   S.members = m.data || []; S.camps = c.data || []; S.deals = d.data || []; S.reqs = r.data || []; S.infl = i.data || []; S.quotas = qt.data || []; S.reads = {}; for (const x of (rd.data || [])) S.reads[x.request_id] = x.seen_at; for (const x of S.reqs) if (!(x.id in S.notified)) S.notified[x.id] = x.last_event_at; if (!S.lastPoll) S.lastPoll = nowIso();
-  for (const x of (s.data || [])) { if (x.key === 'sla') S.sla = { ...DEF_SLA, ...x.value }; if (x.key === 'daily_tasks') S.tasks = x.value || {}; if (x.key === 'bank_pub') S.bankPub = x.value; }
+  for (const x of (s.data || [])) { if (x.key === 'sla') S.sla = { ...DEF_SLA, ...x.value }; if (x.key === 'daily_tasks') S.tasks = x.value || {}; if (x.key === 'kpi') S.kpi = x.value || {}; if (x.key === 'bank_pub') S.bankPub = x.value; }
   S.me = S.members.find(x => x.id === S.user.id) || S.me;
 }
 function upsertLocal(list, row) { const i = list.findIndex(x => x.id === row.id); if (i >= 0) list[i] = row; else list.unshift(row); return row; }
@@ -984,7 +984,7 @@ function renderDash() {
   $('dCreators').innerHTML = `<table><thead><tr><th>الصانع</th><th class="num">رشّح للحملات</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">نسبة القبول</th><th class="num">وصلهم</th><th class="num">نزل كامل</th><th class="num">الإنجاز</th><th class="num">أيام للنشر</th><th class="num">متأخر عنده</th><th class="num">مبالغ المعتمد</th></tr></thead><tbody>${cr.map(x => `<tr><td>${esc(x.m.name)}</td><td class="num">${x.sent}</td><td class="num">${x.ok}</td><td class="num">${x.rej || ''}</td><td class="num">${pl(x.acc)}</td><td class="num">${x.del}</td><td class="num">${x.posted}</td><td class="num">${pl(x.rate)}</td><td class="num">${x.md == null ? '—' : fmt(x.md)}</td><td class="num">${x.late || ''}</td><td class="num">${fmt(x.spend)}</td></tr>`).join('')}</tbody></table>`;
   const byTo = {}; for (const r of S.reqs) { if (!r.to_member || r.kind === 'quota') continue; const o = byTo[r.to_member] = byTo[r.to_member] || { n: 0, done: 0, ontime: 0, due: 0, rounds: [], open: 0, late: 0 }; if (inP(r.created_at)) o.n++; if (inP(r.done_at)) { o.done++; o.rounds.push(r.rounds || 0); if (r.due) { o.due++; if (r.done_at.slice(0, 10) <= r.due) o.ontime++; } } if (!['done', 'cancelled'].includes(r.status)) { o.open++; if (r.due && r.due < today()) o.late++; } }
   $('dReqs').innerHTML = `<table><thead><tr><th>المسؤول</th><th class="num">طلبات جديدة</th><th class="num">سلّمها</th><th class="num">في الموعد</th><th class="num">متوسط جولات التعديل</th><th class="num">مفتوحة</th><th class="num">متأخرة</th></tr></thead><tbody>${Object.entries(byTo).map(([id, o]) => `<tr><td>${esc(memName(id))}</td><td class="num">${o.n}</td><td class="num">${o.done}</td><td class="num">${pl(pct(o.ontime, o.due))}</td><td class="num">${o.rounds.length ? fmt(o.rounds.reduce((s, x) => s + x, 0) / o.rounds.length) : '—'}</td><td class="num">${o.open}</td><td class="num">${o.late || ''}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">ما فيه طلبات للحين.</td></tr>'}</tbody></table>`;
-  renderDaily(a, b);
+  renderDaily(a, b); renderKpi();
 }
 
 /* ================= تقارير اليوم والمعوّقات (للأدمن) ================= */
@@ -1000,7 +1000,7 @@ async function renderDaily(a, b) {
   if (error) { box.innerHTML = `<div class="muted small" style="padding:12px">${esc(friendly(error))}</div>`; return; }
   const R = data || []; const td = today(); const t0 = new Date(td + 'T00:00:00'); const end = new Date(Math.min(+b, +t0));
   const firstDay = R.length ? new Date(R[R.length - 1].day + 'T00:00:00') : t0;
-  const rows = active().map(m => {
+  const rows = active().filter(m => (m.roles || []).length || !m.is_admin).map(m => {
     const L = R.filter(r => r.member_id === m.id); const joined = new Date(m.created_at || 0);
     const from = new Date(Math.max(+a, +new Date(joined.getFullYear(), joined.getMonth(), joined.getDate()), a.getFullYear() < 2001 ? +firstDay : 0));
     const due = from < end ? workDaysBetween(from, end) : 0;
@@ -1027,14 +1027,93 @@ $('dXlsx').onclick = async () => {
   add(reqs, 'الطلبات'); if (evs.length) add(evs, 'سجل الطلبات');
   const { data: DR } = await sb.from('daily_reports').select('*').order('day', { ascending: false }).limit(20000);
   const drs = (DR || []).map(r => { const list = taskListOf(mem(r.member_id)); return { 'التاريخ': r.day, 'الشخص': memName(r.member_id), 'مهام يومية منجزة': list.filter(k => r.tasks && r.tasks[k]).length, 'من أصل': list.length, 'شغل غير مسجّل': r.note, 'المعوّقات': r.blockers, 'آخر حفظ (الرياض)': dtX(r.updated_at) }; });
-  if (drs.length) add(drs, 'تقارير اليوم'); XLSX.writeFile(wb, `أداء فريق العز ${today()}.xlsx`);
+  if (drs.length) add(drs, 'تقارير اليوم');
+  const kc = (S.kpiCards || []).map(x => { const o = { 'الصانع': x.m.name, 'الشهر': $('kMonth').value, 'الدرجة من 60': x.s60 == null ? '' : Math.round(x.s60 * 10) / 10, 'النسبة ٪': x.pct == null ? '' : Math.round(x.pct), 'أوزان لها بيانات': x.max }; x.rows.forEach(r => { o[r.k.n] = r.v == null ? '' : Math.round(r.v * 10) / 10; o[r.k.n + ' (المستوى)'] = r.lv == null ? '' : r.lv; }); return o; });
+  if (kc.length) add(kc, 'بطاقة الأداء'); XLSX.writeFile(wb, `أداء فريق العز ${today()}.xlsx`);
 };
+
+/* ================= بطاقة الأداء الشهرية (المؤشرات الـ11 من إطار الأداء) =================
+   الدرجة من 60 = مجموع (مستوى المؤشر ÷ 6 × وزنه). المؤشر اللي ما له بيانات يُستبعد وتُعاد النسبة على باقي الأوزان.
+   الـ40 الباقية (المهارات) من اختبار ربع سنوي خارج الموقع. */
+const KPI_LV = ['منخفض', 'دون المتوسط', 'متوسط', 'جيد', 'جيد جداً', 'مثالي'];
+const lvUp = (v, t) => 1 + t.filter(x => v >= x).length;      // الأعلى أفضل: t = بدايات المستويات 2..6
+const lvDown = (v, t) => 6 - t.filter(x => v > x).length;     // الأقل أفضل: t = نهايات المستويات 6..2
+const lvOcc = v => v < 35 ? 1 : v < 45 ? 2 : v < 55 ? 3 : v < 65 ? 4 : v < 75 ? 5 : v <= 100 ? 6 : v <= 115 ? 5 : v <= 130 ? 4 : 3;
+const kP = v => fmt(Math.round(v)) + '٪';
+const KPIS = [
+  { k: 'clips', n: 'المقاطع المنشورة', s: 'مقاطع', w: 12, target: '60 بالشهر', show: v => fmt(v), lvl: (v, c) => lvUp(v, [30, 42, 54, 60, 72].map(x => x * c.f)), how: 'مشاركات نزل أول مقطع لها على أي منصة خلال الشهر (كل مشاركة مقطع واحد).' },
+  { k: 'occ', n: 'الإشغال', s: 'إشغال', w: 10, target: '75–100٪', show: kP, lvl: v => lvOcc(v), how: 'حمل العمل ÷ السعة. الحمل = المقاطع + (قيد المتابعة × 0.5) + (الحملات النشطة × 3). فوق 100٪ ينزل المستوى لأنه ضغط زائد.' },
+  { k: 'camps', n: 'الحملات المُدارة', s: 'حملات', w: 4, target: '4 بالشهر', show: v => fmt(v), lvl: (v, c) => lvUp(v, [2, 3, 4, 5, 6].map(x => x * c.f)), how: 'عدد الحملات اللي نزل له فيها مقطع خلال الشهر.' },
+  { k: 'done', n: 'نسبة الإنجاز', s: 'إنجاز', w: 7, target: '95٪', show: kP, lvl: v => lvUp(v, [85, 90, 93, 95, 98]), how: 'اللي نزّلوا ÷ اللي وصلهم المنتج خلال الشهر.' },
+  { k: 'speed', n: 'سرعة النشر', s: 'أيام النشر', w: 5, target: '7 أيام', show: v => fmt(v) + ' يوم', lvl: v => lvDown(v, [4, 7, 10, 14, 21]), how: 'وسيط الأيام من وصول المنتج لأول نشر، للمقاطع اللي نزلت خلال الشهر.' },
+  { k: 'week', n: 'النشر خلال أسبوع', s: 'خلال أسبوع', w: 3, target: '55٪', show: kP, lvl: v => lvUp(v, [25, 35, 45, 55, 70]), how: 'اللي نزّلوا خلال 7 أيام من الوصول ÷ كل اللي نزّلوا خلال الشهر.' },
+  { k: 'late', n: 'المتأخرين', s: 'متأخرين', w: 4, target: '0–3', show: v => fmt(v), lvl: v => lvDown(v, [0, 3, 6, 10, 15]), how: 'وصلهم المنتج من أكثر من 14 يوم وما نزّلوا (لحظة نهاية الشهر، أو الحين للشهر الحالي).' },
+  { k: 'cost', n: 'تكلفة المقطع المدفوع', s: 'تكلفة المقطع', w: 4, target: 'وسيط القسم أو أقل', show: v => fmt(Math.round(v)), lvl: (v, c) => lvDown(v / c.med * 100, [84.99, 100, 110, 125, 150]), how: 'مجموع المبالغ ÷ عدد المقاطع المدفوعة (بالريال فقط)، مقارنة بوسيط القسم.' },
+  { k: 'fresh', n: 'البلوجر الجدد', s: 'جدد', w: 3, target: '6 بالشهر', show: v => fmt(v), lvl: v => lvUp(v, [1, 2, 4, 6, 8]), how: 'مقاطع من حسابات أول مرة تنزّل لنا (ما لها نشر سابق في الموقع، ومو مستوردة من الشيتات القديمة).' },
+  { k: 'tag', n: 'التزام التصنيف', s: 'تصنيف', w: 2, target: '90٪', show: kP, lvl: v => lvUp(v, [50, 70, 80, 90, 98]), how: 'الجدد اللي حالة حسابهم «استقطاب» ÷ كل الجدد فعلاً.' },
+  { k: 'miss', n: 'جودة البيانات', s: 'ناقصة', w: 6, target: '0', show: v => fmt(v), lvl: v => lvDown(v, [0.49, 1.5, 3, 6, 10]), how: 'مقاطع الشهر اللي ينقصها كود أو سعر أو تاريخ وصول. الصف الناقص ينحسب مرة وحدة.' }
+];
+const postAt = d => firstAt(d) || d.posted_at || null;
+function kpiMonth() { const v = $('kMonth').value || today().slice(0, 7); const [y, m] = v.split('-').map(Number); return [new Date(y, m - 1, 1), new Date(y, m, 1)]; }
+function kpiFirstPosts() { const F = {}; for (const d of S.deals) { const t = postAt(d); if (t && d.influencer_id && (!F[d.influencer_id] || new Date(t) < new Date(F[d.influencer_id].t))) F[d.influencer_id] = { t, id: d.id }; } return F; }
+function kpiCard(m, a, b, FP) {
+  const end = new Date(Math.min(+b, Date.now()));
+  const inM = t => !!t && new Date(t) >= a && new Date(t) < b, before = t => !!t && new Date(t) < end;
+  const cfg = S.kpi || {}, cap = Number((cfg.capacity || {})[m.id]) || 80, c = { f: Math.min(1, cap / 80), med: Number(cfg.cost_median) || 1300 };
+  const mine = S.deals.filter(d => d.member_id === m.id), L = mine.filter(d => d.approval === 'approved');
+  const openAt = d => !before(d.closed_at), notPosted = d => !postAt(d) || new Date(postAt(d)) >= end;
+  const clips = L.filter(d => inM(postAt(d)));
+  const pending = L.filter(d => (before(d.shipped_at) || before(d.delivered_at)) && notPosted(d) && openAt(d));
+  const late = pending.filter(d => d.delivered_at && (end - new Date(d.delivered_at)) / 864e5 > 14);
+  const activeCamps = new Set([...clips, ...pending, ...mine.filter(d => inM(d.sent_at) && d.approval !== 'rejected')].map(d => d.campaign_id).filter(Boolean));
+  const load = clips.length + pending.length * 0.5 + activeCamps.size * 3;
+  const recv = L.filter(d => inM(d.delivered_at));
+  const D = clips.filter(d => d.delivered_at).map(d => Math.max(0, days(d.delivered_at, postAt(d))));
+  const paid = clips.filter(d => Number(d.price) > 0 && (!d.currency || d.currency === 'SAR'));
+  const fresh = clips.filter(d => { const i = infl(d.influencer_id); return i && i.source !== 'import' && FP[d.influencer_id] && FP[d.influencer_id].id === d.id; });
+  const miss = clips.filter(d => d.price == null || (!d.no_ship && !d.delivered_at) || !(d.tt_code || d.ig_code || d.sn_code || d.sn_user || d.post_url) || platKeys(d).filter(p => delivered(d, p)).some(p => p === 'sn' ? !d.sn_user : !d[p + '_code']));
+  const V = {
+    clips: [clips.length, c.f < 1 ? `مستهدف التأهيل ${fmt(60 * c.f)}` : ''],
+    occ: [load / cap * 100, `${clips.length} مقطع + ${pending.length} قيد المتابعة × 0.5 + ${activeCamps.size} حملة × 3 = ${fmt(load)} من سعة ${cap}`],
+    camps: [new Set(clips.map(d => d.campaign_id).filter(Boolean)).size, ''],
+    done: [recv.length ? recv.filter(d => postAt(d)).length / recv.length * 100 : null, `${recv.filter(d => postAt(d)).length} نزّلوا من ${recv.length} وصلهم`],
+    speed: [D.length ? median(D) : null, `${D.length} مقطع له تاريخ وصول`],
+    week: [D.length ? D.filter(x => x <= 7).length / D.length * 100 : null, `${D.filter(x => x <= 7).length} من ${D.length}`],
+    late: [L.some(d => before(d.delivered_at)) ? late.length : null, late.slice(0, 5).map(d => d.name).join('، ')],
+    cost: [paid.length ? paid.reduce((s, d) => s + Number(d.price), 0) / paid.length : null, `${paid.length} مقطع مدفوع · وسيط القسم ${fmt(c.med)}`],
+    fresh: [fresh.length, ''],
+    tag: [fresh.length ? fresh.filter(d => infl(d.influencer_id).account_status === 'استقطاب').length / fresh.length * 100 : null, ''],
+    miss: [clips.length ? miss.length : null, miss.slice(0, 5).map(d => d.name).join('، ')]
+  };
+  const rows = KPIS.map(k => { const [v, sub] = V[k.k]; const lv = v == null ? null : Math.max(1, Math.min(6, k.lvl(v, c))); return { k, v, sub, lv, pts: lv == null ? null : lv / 6 * k.w }; });
+  const max = rows.reduce((s, r) => s + (r.lv == null ? 0 : r.k.w), 0), score = rows.reduce((s, r) => s + (r.pts || 0), 0);
+  return { m, rows, cap, clips: clips.length, max, score, pct: max ? score / max * 100 : null, s60: max ? score / max * 60 : null };
+}
+const lvCls = lv => lv == null ? '' : lv <= 2 ? 'bad' : lv <= 4 ? 'warn' : 'good';
+function renderKpi() {
+  const sel = $('kMonth'); if (!sel) return;
+  if (!sel.options.length) { const n = new Date(); sel.innerHTML = Array.from({ length: 12 }, (_, i) => { const d = new Date(n.getFullYear(), n.getMonth() - i, 1); return `<option value="${ymd(d).slice(0, 7)}">${d.toLocaleDateString(LOC, { month: 'long', year: 'numeric' })}</option>`; }).join(''); }
+  const [a, b] = kpiMonth(), FP = kpiFirstPosts(), now = new Date(), cur = now >= a && now < b;
+  $('kSub').textContent = cur ? `الشهر ما اكتمل: اليوم ${now.getDate()} من ${new Date(b - 864e5).getDate()}. مؤشرات العدد (المقاطع، الحملات، الجدد) تكبر مع الأيام.` : 'شهر مكتمل.';
+  const C = creators().map(m => kpiCard(m, a, b, FP)).sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1)); S.kpiCards = C;
+  $('kCard').innerHTML = C.length ? `<table><thead><tr><th>الصانع</th><th class="num">الدرجة من 60</th><th class="num">النسبة</th>${KPIS.map(k => `<th class="num" title="${esc(k.n)} · الوزن ${k.w}">${k.s}<small class="muted" style="display:block;font-weight:400">${k.w}</small></th>`).join('')}</tr></thead><tbody>${C.map(x => `<tr class="click" data-kpi="${x.m.id}"><td>${esc(x.m.name)}${x.cap < 80 ? ' <span class="pill">تأهيل</span>' : ''}${x.clips < 5 ? ' <span class="pill" title="أقل من 5 مقاطع في الشهر: النسب مبنية على عدد قليل، لا تحكم منها لحالها">عيّنة صغيرة</span>' : ''}</td><td class="num"><b>${x.s60 == null ? '—' : fmt(x.s60)}</b></td><td class="num">${x.pct == null ? '—' : `<span class="pill ${x.pct >= 75 ? 'good' : x.pct >= 65 ? 'warn' : 'bad'}">${Math.round(x.pct)}٪</span>`}</td>${x.rows.map(r => `<td class="num">${r.lv == null ? '<span class="muted" title="بدون بيانات: مستبعد من الدرجة">—</span>' : `<span class="pill ${lvCls(r.lv)}" title="${KPI_LV[r.lv - 1]}">${r.k.show(r.v)}</span>`}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<div class="muted small" style="padding:12px">ما فيه أحد دوره «صانع محتوى». حدد الأدوار من الإعدادات.</div>';
+}
+function openKpi(id) {
+  const x = (S.kpiCards || []).find(c => c.m.id === id); if (!x) return; const sel = $('kMonth');
+  modal(`<div class="row between"><div><h2>بطاقة أداء ${esc(x.m.name)}</h2><div class="muted small">${esc(sel.options[sel.selectedIndex].text)} · المؤشرات ${x.s60 == null ? '—' : fmt(x.s60)} من 60${x.max < 60 ? ` (محسوبة على ${x.max} وزن له بيانات)` : ''}${x.cap < 80 ? ` · سعة التأهيل ${x.cap}` : ''}</div></div><button class="btn" id="kX" type="button">إغلاق</button></div>
+   <div class="tw"><table><thead><tr><th>المؤشر</th><th class="num">النتيجة</th><th>المستهدف</th><th>المستوى</th><th class="num">النقاط</th></tr></thead><tbody>${x.rows.map(r => `<tr><td style="white-space:normal;min-width:220px"><b>${esc(r.k.n)}</b><small class="muted" style="display:block">${esc(r.k.how)}${r.sub ? ' — ' + esc(r.sub) : ''}</small></td><td class="num">${r.v == null ? '—' : r.k.show(r.v)}</td><td class="small">${esc(r.k.target)}</td><td>${r.lv == null ? '<span class="muted small">بدون بيانات (مستبعد)</span>' : `<span class="pill ${lvCls(r.lv)}">${r.lv} · ${KPI_LV[r.lv - 1]}</span>`}</td><td class="num">${r.pts == null ? '—' : fmt(r.pts)} / ${r.k.w}</td></tr>`).join('')}</tbody></table></div>
+   <div class="note">النقاط = (المستوى ÷ 6) × الوزن. هذي الـ60 حقت المؤشرات، والـ40 حقت المهارات تنضاف من الاختبار الربع سنوي.</div>`, () => { $('kX').onclick = closeModal; });
+}
+$('kMonth').addEventListener('change', renderKpi);
+$('kCard').addEventListener('click', e => { const r = e.target.closest('[data-kpi]'); if (r) openKpi(r.dataset.kpi); });
 
 /* ================= الإعدادات ================= */
 function renderSetup() {
   $('sMembers').innerHTML = `<table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الأدوار</th><th>مفعّل</th><th>مدير</th><th></th></tr></thead><tbody>${S.members.map(m => `<tr data-m="${m.id}"><td><input type="text" data-k="name" value="${esc(m.name)}" style="min-width:140px"></td><td class="small" dir="ltr">${esc(m.email)}</td><td style="white-space:normal;min-width:260px">${Object.entries(ROLES).map(([k, n]) => `<label class="check small" style="display:inline-flex;min-height:28px;margin-inline-end:8px"><input type="checkbox" data-role="${k}" ${(m.roles || []).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</td><td><input type="checkbox" data-k="active" ${m.active ? 'checked' : ''} aria-label="مفعّل"></td><td><input type="checkbox" data-k="is_admin" ${m.is_admin ? 'checked' : ''} ${m.id === S.me.id ? 'disabled' : ''} aria-label="مدير"></td><td><button class="btn sm primary" data-msave type="button">حفظ</button></td></tr>`).join('')}</tbody></table>`;
   $('sSla').innerHTML = STEPS.map(s => `<div class="field"><label for="sla_${s.k}">${s.n}</label><input type="number" min="0" id="sla_${s.k}" value="${S.sla[s.k]}"></div>`).join('');
   $('sTasks').innerHTML = Object.entries(ROLES).filter(([k]) => k !== 'creator').map(([k, n]) => `<div class="field"><label for="tk_${k}">${n}</label><textarea id="tk_${k}">${esc((S.tasks[k] || []).join('\n'))}</textarea></div>`).join('');
+  const K = S.kpi || {};
+  $('sKpi').innerHTML = `<div class="field"><label for="kp_med">وسيط تكلفة المقطع المدفوع (ر.س)</label><input type="number" min="0" id="kp_med" value="${Number(K.cost_median) || 1300}"></div>` + creators().map(m => `<div class="field"><label for="kp_${m.id}">سعة ${esc(m.name)}</label><input type="number" min="1" data-cap="${m.id}" id="kp_${m.id}" value="${Number((K.capacity || {})[m.id]) || 80}"></div>`).join('');
   $('sBank').innerHTML = S.bankPub ? `<div class="muted small">التشفير شغال. المفتاح العام محفوظ، والمؤثرين يقدرون يعبّون حساباتهم البنكية.</div>
      <div class="row"><span class="pill ${S.bankPriv ? 'good' : 'warn'}">${S.bankPriv ? 'مفتاحك الخاص محمّل على هذا الجهاز' : 'مفتاحك الخاص مو محمّل على هذا الجهاز'}</span><label class="btn sm">تحميل ملف المفتاح الخاص<input type="file" id="bankFile" accept=".json" hidden></label>${S.bankPriv ? '<button class="btn sm" id="bankForget" type="button">إزالة المفتاح من هذا الجهاز</button>' : ''}</div>`
     : `<div class="note">ما فيه تشفير للحين. اضغط الزر: يتولّد مفتاحين، العام ينحفظ في النظام، والخاص ينزل عندك كملف. احفظه في مكان آمن، لأنه الطريقة الوحيدة لقراءة الحسابات البنكية.</div><button class="btn primary" id="bankGen" type="button">إنشاء مفاتيح التشفير</button>`;
@@ -1051,6 +1130,7 @@ $('sMembers').addEventListener('click', async e => { const b = e.target.closest(
   const ch = { name: tr.querySelector('[data-k=name]').value.trim(), active: tr.querySelector('[data-k=active]').checked, is_admin: tr.querySelector('[data-k=is_admin]').checked, roles: [...tr.querySelectorAll('[data-role]:checked')].map(c => c.dataset.role) };
   if (await q(sb.from('members').update(ch).eq('id', tr.dataset.m))) { Object.assign(mem(tr.dataset.m), ch); toast('انحفظ'); } });
 $('sSlaSave').onclick = async () => { const v = Object.fromEntries(STEPS.map(s => [s.k, Number($('sla_' + s.k).value) || 0])); if (await q(sb.from('settings').upsert({ key: 'sla', value: v }))) { S.sla = v; toast('انحفظت المدد'); } };
+$('sKpiSave').onclick = async () => { const capacity = {}; document.querySelectorAll('[data-cap]').forEach(x => { const n = Number(x.value) || 80; if (n !== 80) capacity[x.dataset.cap] = n; }); const v = { cost_median: Number($('kp_med').value) || 1300, capacity }; if (await q(sb.from('settings').upsert({ key: 'kpi', value: v }))) { S.kpi = v; toast('انحفظت إعدادات بطاقة الأداء'); } };
 $('sTasksSave').onclick = async () => { const v = {}; Object.keys(ROLES).filter(k => k !== 'creator').forEach(k => { const L = $('tk_' + k).value.split('\n').map(s => s.trim()).filter(Boolean); if (L.length) v[k] = L; }); if (await q(sb.from('settings').upsert({ key: 'daily_tasks', value: v }))) { S.tasks = v; toast('انحفظت القوائم'); } };
 
 /* ================= التشغيل ================= */
