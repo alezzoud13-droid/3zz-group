@@ -692,6 +692,9 @@ function dealRow(x, bulk, k) {
   const ageTag = late === 'late' ? `<span class="pill bad">متأخر · ${dayWord(age)}</span>` : late === 'soon' ? '<span class="pill warn">آخر يوم في المدة</span>' : `<span class="age">${dayWord(age)}</span>`;
   return `<div class="qrow ${late}">${bulk ? `<input type="checkbox" data-bulk="${d.id}" aria-label="تحديد ${esc(d.name)}">` : '<span></span>'}<div><div class="t">${esc(d.name)}</div><div class="sub">${esc(sub)}</div></div><div class="acts">${ageTag}${go}${moreWrap(more, d.name)}</div></div>`;
 }
+/* البيانات الإلزامية قبل ما ينتقل الملف من مرحلة لمرحلة: المبلغ (0 = مقابل منتج) ومنصة التنزيل.
+   اعتماد الاستقطاب مستثنى لأن ما فيه خانة مبلغ في تلك المرحلة. */
+const needs = d => { const m = []; if (d.price == null || d.price === '' || isNaN(Number(d.price))) m.push('المبلغ'); if (!platKeys(d).length) m.push('منصة التنزيل'); return m; };
 const GO_LABEL = { camp_fix: 'عدّل الترشيح', camp_draft: 'كمّل الترشيح', intake: 'كمّل العنوان', video: 'أرسل المقطع الخام', video_fix: 'أعد إرسال المقطع', draft: 'راجع المقطع', post: 'سجّل النزول', ship_fail: 'تابع التسليم' };
 const dayWord = n => n <= 0 ? 'اليوم' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? n + ' أيام' : n + ' يوم';
 const moreWrap = (html, name) => html ? `<span class="morew"><button class="btn sm icon" data-more type="button" aria-haspopup="true" aria-expanded="false" aria-label="إجراءات أخرى: ${esc(name)}">⋯</button><span class="more">${html}</span></span>` : '';
@@ -719,7 +722,7 @@ function renderMine() {
   $('mineBody').innerHTML = bar + start + (QO.filter(k => G[k] && G[k].some(keep)).sort((a, b) => secOf(a) - secOf(b)).map(k => {
     const L = G[k].filter(keep), b = BULK[k]; const lateN = L.filter(x => x.d && lateness(x.d, x.i) === 'late').length;
     const head = secOf(k) !== lastSec ? `<h3 class="msec">${SEC[lastSec = secOf(k)][0]}</h3>` : '';
-    const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay' || k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع Excel</button>' : ''}${k === 'snap_follow' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
+    const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع للمحدد Excel</button>' : ''}${k === 'snap_follow' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
     else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي لك ${left} ترشيح</div></div><div class="acts"><button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button></div></div>`).join('');
@@ -748,6 +751,7 @@ $('mineBody').addEventListener('click', async e => {
   const as = e.target.closest('[data-as]'); if (as) { $('mineAs').value = as.dataset.as; return renderMine(); }
   const mf = e.target.closest('[data-mf]'); if (mf) { S.mineF = S.mineF === mf.dataset.mf ? 'all' : mf.dataset.mf; return renderMine(); }
   const a1 = e.target.closest('[data-ap1]'); if (a1) { if (a1.disabled) return; const d = S.deals.find(x => x.id === a1.dataset.ap1); if (!d) return;
+    const miss = needs(d); if (miss.length) return toast(`ما ينعتمد وهو ناقص: ${miss.join('، ')}. رجّعه بـ«تعديل»`, true);
     const lbl = a1.textContent; a1.disabled = true; a1.setAttribute('aria-busy', 'true'); a1.textContent = 'جاري الحفظ…';
     const r = await saveDeal(d.id, BULK.appr[1](d));
     if (r) { toast('تم اعتماد ' + d.name); render(); } else if (document.contains(a1)) { a1.disabled = false; a1.removeAttribute('aria-busy'); a1.textContent = lbl; }
@@ -758,6 +762,7 @@ $('mineBody').addEventListener('click', async e => {
   const b = e.target.closest('[data-dobulk]'); if (b) {
     const k = b.dataset.dobulk; const ids = [...b.closest('[data-g]').querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk);
     if (!ids.length) return toast('حدّد ملف واحد على الأقل', true);
+    if (['appr', 'pay', 'pay_go'].includes(k)) { const bad = ids.map(id => S.deals.find(x => x.id === id)).filter(d => d && (k === 'appr' ? needs(d).length : needs(d).includes('المبلغ'))); if (bad.length) return toast(`ما يكمل «${BULK[k][0]}»: المبلغ أو المنصة ناقصة في ${bad.map(d => d.name).join('، ')}. ${k === 'appr' ? 'رجّعها للتعديل أو شيل تحديدها' : 'اكتب المبلغ في الملف أول'}`, true); }
     if (!await confirmBox(`${BULK[k][0]}: ${ids.length} ملف؟`)) return;
     b.disabled = true; let ok = 0; for (const id of ids) { const d = S.deals.find(x => x.id === id); if (d && await saveDeal(id, BULK[k][1](d))) ok++; }
     toast(`تحدّث ${ok} ملف`); render();
@@ -774,10 +779,13 @@ function shipSheet() {
   XLSX.utils.book_append_sheet(wb, ws, 'كشف الشحن'); XLSX.writeFile(wb, `كشف الشحن ${today()}.xlsx`);
 }
 /* كشف الدفع: كل اللي نزل محتواه وما اندفع — للمالية */
-function paySheet() {
+function paySheet(ids) {
   const dt = t => t ? dtX(t) : '';
-  const L = S.deals.filter(d => d.approval === 'approved' && allDelivered(d) && !d.paid_at && !d.no_pay && !isClosed(d)).sort((a, b) => new Date(a.posted_at || a.updated_at) - new Date(b.posted_at || b.updated_at));
-  if (!L.length) return toast('ما فيه دفعات معلّقة الحين', true);
+  if (!ids || !ids.length) return toast('حدّد بالمربعات الملفات اللي تبي تنزّلها في الكشف', true);
+  /* الكشف للمالية: المحدد فقط، وبشرط إن عبدالمحسن اعتمد دفعه وما اندفع */
+  const L = S.deals.filter(d => ids.includes(d.id) && d.pay_ok_at && d.approval === 'approved' && allDelivered(d) && !d.paid_at && !d.no_pay && !isClosed(d)).sort((a, b) => new Date(a.posted_at || a.updated_at) - new Date(b.posted_at || b.updated_at));
+  if (!L.length) return toast('المحدد ما فيه شي معتمد للدفع', true);
+  const noAmt = L.filter(d => needs(d).includes('المبلغ')); if (noAmt.length) return toast(`ما ينزل الكشف: المبلغ ناقص في ${noAmt.map(d => d.name).join('، ')}`, true);
   const rows = L.map((d, n) => ({ 'م': n + 1, 'الحالة': d.pay_ok_at ? 'معتمد للدفع' : 'ينتظر موافقة عبدالمحسن', 'المؤثر': d.name, 'اليوزر': d.handle, 'جوال المؤثر': d.phone || d.rcv_phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency || 'SAR', 'نزل المحتوى': dt(d.posted_at || d.tt_at || d.sn_at || d.ig_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'ملاحظات': d.notes || '' }));
   const tot = L.reduce((s, d) => s + (Number(d.price) || 0), 0);
   rows.push({ 'م': '', 'الحالة': 'الإجمالي', 'المؤثر': '', 'اليوزر': '', 'جوال المؤثر': '', 'الحملة': '', 'صانع المحتوى': '', 'المنصات': '', 'المبلغ': tot, 'العملة': 'SAR', 'نزل المحتوى': '', 'اعتماد الدفع': '', 'ملاحظات': '' });
@@ -804,7 +812,7 @@ function ziadSheet() {
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, Math.min(34, k.length + 8)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'شيت التشغيل'); XLSX.writeFile(wb, `شيت التشغيل ${today()}.xlsx`);
 }
-$('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); if (e.target.closest('[data-salx]')) salasilSheet(); if (e.target.closest('[data-payx]')) paySheet(); if (e.target.closest('[data-ziadx]')) ziadSheet(); });
+$('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); if (e.target.closest('[data-salx]')) salasilSheet(); const px = e.target.closest('[data-payx]'); if (px) paySheet([...px.closest('[data-g]').querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk)); if (e.target.closest('[data-ziadx]')) ziadSheet(); });
 
 /* ================= ملف المشاركة في الحملة ================= */
 function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${i === SI.video && draftPending(d) ? ` (عند ${esc(apprFor(d.member_id))})` : ''}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
@@ -874,8 +882,8 @@ function openDeal(id) {
     const dl = p => { const ch = { [p + '_at']: nowIso() }; if (p === 'sn') { ch.sn_user = val('sn_user'); ch.sn_code = val('sn_code'); if (!ch.sn_user) { toast('اكتب يوزر سناب', true); return null; } } else { ch[p + '_code'] = val(p + '_code'); if (!ch[p + '_code']) { toast('اكتب الكود', true); return null; } } if (p === 'tt' && val('post_url')) ch.post_url = val('post_url'); if (allDelivered({ ...d, ...ch })) Object.assign(ch, { posted_at: nowIso(), video_ok_at: d.video_ok_at || nowIso() }); return ch; };
     const A = {
       save0: base,
-      send: () => { const b = base(); if (!b.platform) { toast('حدّد منصة التنزيل', true); return null; } return { ...b, sent_at: nowIso(), approval: 'pending', decision_reason: '' }; },
-      approve: () => ({ approval: 'approved', approved_at: nowIso(), approved_by: me, decision_reason: '' }),
+      send: () => { const b = base(); if (!b.platform) { toast('حدّد منصة التنزيل', true); return null; } if (b.price == null) { toast('اكتب المبلغ قبل الإرسال. إذا مقابل منتج اكتب 0', true); return null; } if (!b.name) { toast('اكتب اسم المؤثر', true); return null; } return { ...b, sent_at: nowIso(), approval: 'pending', decision_reason: '' }; },
+      approve: () => { const m = needs(d); if (m.length) { toast(`ما ينعتمد وهو ناقص: ${m.join('، ')}. رجّعه بـ«يحتاج تعديل»`, true); return null; } return { approval: 'approved', approved_at: nowIso(), approved_by: me, decision_reason: '' }; },
       backup: () => ({ approval: 'backup' }),
       addr: () => { const p = normPhone(val('rcv_phone')); if (val('rcv_phone') && p === null) { toast('رقم الجوال مو صحيح', true); return null; } return { ...pick(['rcv_name', 'rcv_city', 'address', 'country']), rcv_phone: p || '' }; },
       flags: () => pick(['no_ship', 'no_pay']),
@@ -884,8 +892,8 @@ function openDeal(id) {
       failed: () => { if (!val('ship_note')) { toast('اكتب سبب تعذّر التسليم في «ملاحظة الشحن»', true); return null; } return { ship_note: val('ship_note'), ship_failed_at: nowIso() }; },
       draft: () => { if (!safeUrl(val('draft_url'))) { toast('حط رابط المقطع الخام (يبدأ بـ https)', true); return null; } return { draft_url: val('draft_url'), draft_note: val('draft_note'), draft_at: nowIso() }; },
       vok: () => ({ video_ok_at: nowIso(), draft_feedback: '' }),
-      paid: () => ({ paid_at: d.paid_at ? null : nowIso() }),
-      payok: () => ({ pay_ok_at: nowIso(), pay_ok_by: me }),
+      paid: () => { if (!d.paid_at && needs(d).includes('المبلغ')) { toast('اكتب المبلغ في قسم الترشيح قبل تسجيل الدفع', true); return null; } return { paid_at: d.paid_at ? null : nowIso() }; },
+      payok: () => { if (needs(d).includes('المبلغ')) { toast('اكتب المبلغ في قسم الترشيح قبل اعتماد الدفع', true); return null; } return { pay_ok_at: nowIso(), pay_ok_by: me }; },
       close: () => ({ closed_at: nowIso(), closed_reason: 'ما رد / ألغي' }),
       reopen: () => ({ closed_at: null, closed_reason: '', approval: d.approval === 'rejected' ? 'pending' : d.approval, sent_at: d.approval === 'rejected' ? null : d.sent_at })
     };

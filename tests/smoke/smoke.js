@@ -650,7 +650,10 @@ const SCENARIOS = [
     await t.exported(() => t.click(`${mine} [data-g="ship_send"] [data-salx]`));
   }),
   A('admin_export_pay_sheet', 'admin', '#mine', async t => {
-    await t.exported(() => t.click(`${mine} [data-g="pay"] [data-payx]`));
+    /* من 12 نوفمبر: الكشف ينزل من «معتمدة للدفع» فقط، وللمحدد فقط */
+    await t.quiet(() => t.click(`${mine} [data-g="pay_go"] [data-payx]`));                  // بدون تحديد: ما ينزل شي
+    await t.check(`${mine} [data-g="pay_go"] [data-all]`);
+    await t.exported(() => t.click(`${mine} [data-g="pay_go"] [data-payx]`));
   }),
   A('snap_export_tracker_sheet', 'snap', '#mine', async t => {
     await t.exported(() => t.click(`${mine} [data-g="snap_follow"] [data-ziadx]`));
