@@ -659,6 +659,7 @@ function renderMine() {
   $('mineSub').textContent = total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : 'ما عندك شي معلّق.';
   $('mineBody').innerHTML = QO.filter(k => G[k] && G[k].length).map(k => {
     const L = G[k], b = BULK[k]; const lateN = L.filter(x => x.d && lateness(x.d, x.i) === 'late').length;
+    const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay' || k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع Excel</button>' : ''}${k === 'snap_follow' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
     else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي لك ${left} ترشيح</div></div><div class="acts"><button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button></div></div>`).join('');
@@ -666,7 +667,7 @@ function renderMine() {
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }
     else rows = L.map(x => dealRow(x, !!b, k)).join('');
-    return `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b ? `<span style="margin-inline-start:auto" class="row">${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button>' : ''}${k === 'pay' || k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع Excel</button>' : ''}<label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button></span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
+    return `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b || xb ? `<span style="margin-inline-start:auto" class="row">${xb}${b ? `<label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button>` : ''}</span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
   }).join('') || '<div class="empty">ما عندك شي معلّق الحين. ابدأ من «+ ترشيح» أو اطلب شي من زميل من «+ طلب».</div>';
 }
 function renderTeam() {
@@ -717,7 +718,27 @@ function paySheet() {
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(10, Math.min(40, k.length + 8)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'كشف الدفع'); XLSX.writeFile(wb, `كشف الدفع ${today()}.xlsx`);
 }
-$('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); if (e.target.closest('[data-payx]')) paySheet(); });
+/* كشف سلاسل: الجاهز للشحن بصيغة ملف الرفع الجماعي حق شركة الشحن (نفس أعمدة SINV) */
+function salasilSheet() {
+  const L = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval === 'approved' && curStep(d) === SI.ship && !d.shipped_at).sort((a, b) => new Date(a.approved_at || a.created_at) - new Date(b.approved_at || b.created_at));
+  if (!L.length) return toast('ما فيه شحنات جاهزة للرفع الحين', true);
+  const base = 'INF' + today().replace(/-/g, '');
+  const rows = L.map((d, n) => ({ orderNum: `${base}-${n + 1}`, Shipping_Method: '', phone: ph9(d.rcv_phone || d.phone) || '', name: d.rcv_name || d.name, address: [d.address, d.short_code].filter(Boolean).join('-'), city: d.rcv_city || '', state: d.rcv_city || '', zip: '0', country: d.country === 'السعودية' || !d.country ? 'SA' : d.country, cod: '0', sku: camp(d.campaign_id).product || camp(d.campaign_id).name || '', QTY: '1' }));
+  const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 18 }));
+  XLSX.utils.book_append_sheet(wb, ws, 'ALEZZ'); XLSX.writeFile(wb, `كشف سلاسل ${today()}.xlsx`);
+}
+/* شيت التشغيل لزياد: نفس أعمدة Content Tracker — السيريال (كود الفيديو) وأسماء الإعلانات يولدها الشيت نفسه */
+const CAMP_EN = { 'هيرش سيطرة': 'Hersh Saytara', 'سطوة القرن': 'Satwat AlQarn', 'هيرش فاير': 'Hersh Fire', 'هيرش محور': 'Hersh Mhwar', 'هيرش': 'Hersh' };
+function ziadSheet() {
+  const dd = t => t ? new Date(t).toLocaleDateString('en-GB', { timeZone: TZ }) : '';
+  const L = S.deals.filter(d => d.approval === 'approved' && !isClosed(d) && platKeys(d).some(p => delivered(d, p))).sort((a, b) => new Date(a.posted_at || a.tt_at || a.sn_at || a.ig_at || 0) - new Date(b.posted_at || b.tt_at || b.sn_at || b.ig_at || 0));
+  if (!L.length) return toast('ما فيه محتوى نازل للحين', true);
+  const rows = L.map(d => { const cn = camp(d.campaign_id).name || '';
+    return { 'اسم المنتج أو العرض': CAMP_EN[cn] || cn, 'صانع المحتوى': d.name, 'اسم صانع المحتوى بالإنجليزي': '', 'Content Type': 'Review', 'تصنيف صانع المحتوى': 'Influencer', 'رابط الفيديو على السوشيال': d.post_url || (d.handle ? 'https://www.tiktok.com/@' + d.handle : ''), 'الفيديو': '', 'TikTok | كود الترويج': d.tt_code || '', 'Meta | كود الترويج': d.ig_code || '', 'Snapchat | كود الترويج': d.sn_code || d.sn_user || '', 'كود الفيديو': '', 'تاريخ إضافة الفيديو': dd(d.posted_at || d.tt_at || d.sn_at || d.ig_at) }; });
+  const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, Math.min(34, k.length + 8)) }));
+  XLSX.utils.book_append_sheet(wb, ws, 'شيت التشغيل'); XLSX.writeFile(wb, `شيت التشغيل ${today()}.xlsx`);
+}
+$('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); if (e.target.closest('[data-salx]')) salasilSheet(); if (e.target.closest('[data-payx]')) paySheet(); if (e.target.closest('[data-ziadx]')) ziadSheet(); });
 
 /* ================= ملف المشاركة في الحملة ================= */
 function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${i === SI.video && draftPending(d) ? ` (عند ${esc(apprFor(d.member_id))})` : ''}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
