@@ -582,8 +582,13 @@ async function requestQuota(cid) {
 
 /* ================= صفحة الحملات ================= */
 function renderCamps() {
-  const showEnded = $('cEnded').checked, me = S.me.id, ap = isApprover(), adm = isAdmin();
-  const L = S.camps.filter(c => showEnded || c.status !== 'ended');
+  const me = S.me.id, ap = isApprover(), adm = isAdmin();
+  /* المتوقفة والمنتهية مخفية عن الكل فور تغيير حالتها؛ أرشيفها لعبدالمحسن ومتعب فقط */
+  const canOld = adm || ap; $('cEndedWrap').hidden = !canOld;
+  const showOld = canOld && $('cEnded').checked;
+  const ORD = { active: 0, paused: 1, ended: 2 };
+  const L = S.camps.filter(c => showOld || (c.status || 'active') === 'active')
+    .sort((a, b) => (ORD[a.status || 'active'] ?? 3) - (ORD[b.status || 'active'] ?? 3) || new Date(b.created_at || 0) - new Date(a.created_at || 0));
   $('cList').innerHTML = L.map(c => {
     const st = campStats(c.id); const D = st.all.filter(d => !d.closed_at || d.approval === 'rejected');
     const shipping = st.approved.filter(d => !d.delivered_at && !d.no_ship).length, deliv = st.approved.filter(d => d.delivered_at).length, posted = st.approved.filter(allDelivered).length;
@@ -975,7 +980,7 @@ function renderPipe() {
   $('board').innerHTML = STEPS.map((s, i) => { const L = open.filter(d => curStep(d) === i), late = L.filter(d => lateness(d, i) === 'late').length; return `<button class="col${S.pStep === s.k ? ' on' : ''}" data-col="${s.k}" type="button"><span class="k">${i + 1}</span><span class="nm">${s.n}</span><span class="small muted">${esc(stepWho(s))}</span><span class="n">${L.length}</span><span class="small" style="color:var(--bad)">${late ? late + ' متأخر' : '&nbsp;'}</span></button>`; }).join('')
     + `<button class="col${S.pStep === 'done' ? ' on' : ''}" data-col="done" type="button"><span class="k">✓</span><span class="nm">اكتمل</span><span class="small muted">&nbsp;</span><span class="n">${open.filter(d => curStep(d) === STEPS.length).length}</span><span class="small">&nbsp;</span></button>`;
   fillSel('pMem', creators().map(m => [m.id, m.name]), 'الكل');
-  fillSel('pCamp', S.camps.map(c => [c.id, c.name]), 'الكل');
+  fillSel('pCamp', S.camps.filter(c => (c.status || 'active') === 'active' || S.deals.some(d => d.campaign_id === c.id && !d.closed_at)).map(c => [c.id, c.name]), 'الكل');
   const qq = $('pQ').value.trim().toLowerCase(), pm = $('pMem').value, pc = $('pCamp').value, late = $('pLate').checked, cl = $('pClosed').checked;
   const L = S.deals.filter(d => { const i = curStep(d);
     if (!inPipe(d)) return false; if (!cl && isClosed(d)) return false; if (pm && d.member_id !== pm) return false; if (pc && d.campaign_id !== pc) return false;
