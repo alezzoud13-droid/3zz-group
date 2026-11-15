@@ -1048,6 +1048,7 @@ function reqRow(r) {
   return `<div class="qrow ${late} ${u ? 'unread' : ''}"><span>${u ? '<i class="dot" title="تحديث جديد"></i>' : ''}</span><div><div class="t">${esc(r.title)}${r.rounds ? ` <span class="pill warn">تعديل ${r.rounds}</span>` : ''}</div><div class="sub">${esc([REQ_KINDS[r.kind], 'من ' + memName(r.from_member), r.to_member ? 'إلى ' + memName(r.to_member) : '', r.due ? 'الموعد ' + r.due : ''].filter(Boolean).join(' · '))}</div>${ll ? `<div class="sub">${u ? '<b>جديد:</b> ' : 'آخر حدث: '}${esc(ll)}</div>` : ''}</div><div class="acts row" style="gap:6px"><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span><button class="btn sm" data-req="${r.id}" type="button">افتح</button></div></div>`;
 }
 function renderReqs() {
+  const allOpt = $('rScope').querySelector('[value=all]'); if (allOpt && !(isAdmin() || isApprover())) allOpt.remove();   // «الكل» لعبدالمحسن ومتعب فقط — والقاعدة نفسها ما ترجع غير طلبات الشخص
   const sc = $('rScope').value, dn = $('rDone').checked, me = S.me.id;
   const L = S.reqs.filter(r => (sc === 'all' || (sc === 'me' ? involved(r) : sc === 'to' ? (r.to_member === me || (r.kind === 'quota' && isApprover())) : r.from_member === me)) && (dn || !['done', 'cancelled'].includes(r.status) || unread(r)))
     .sort((a, b) => (unread(b) - unread(a)) || (tms(b.last_event_at || b.created_at) - tms(a.last_event_at || a.created_at)));
