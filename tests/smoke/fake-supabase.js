@@ -15,6 +15,8 @@
   'use strict';
   const FX = window.__makeFixtures(Date.now());
   const DB = FX.db;
+  // تحديث 11: رموز روابط المؤثرين في جدول خاص
+  DB.deal_links = DB.deal_links || DB.deals.filter(d => d.intake_token).map(d => ({ deal_id: d.id, token: d.intake_token }));
   const persona = window.__PERSONA || 'admin';
   let sessionUser = FX.personas[persona] ? userOf(FX.personas[persona]) : null;
   function userOf(id) { const m = DB.members.find(x => x.id === id); return m ? { id: m.id, email: m.email } : null; }
@@ -100,7 +102,7 @@
     request_reads: () => ({ member_id: uid(), seen_at: nowIso() }),
     daily_reports: () => ({ tasks: {}, note: '', blockers: '', updated_at: nowIso() })
   };
-  const PK = { members: ['id'], settings: ['key'], campaigns: ['id'], deals: ['id'], deal_bank: ['deal_id'], influencers: ['id'], quotas: ['campaign_id', 'member_id'], requests: ['id'], request_events: ['id'], request_reads: ['request_id', 'member_id'], daily_reports: ['member_id', 'day'] };
+  const PK = { members: ['id'], settings: ['key'], campaigns: ['id'], deals: ['id'], deal_bank: ['deal_id'], deal_links: ['deal_id'], influencers: ['id'], quotas: ['campaign_id', 'member_id'], requests: ['id'], request_events: ['id'], request_reads: ['request_id', 'member_id'], daily_reports: ['member_id', 'day'] };
   const TOUCH = ['deals', 'requests', 'settings', 'influencers', 'quotas'];             // audit(): updated_at := now()
   const posted = d => !!(d.tt_at || d.ig_at || d.sn_at || d.posted_at);
   /* SELECT policies after migration 007 */
@@ -110,6 +112,7 @@
     deals: d => hasRole('approver') || d.member_id === uid() || (d.approval === 'approved' && hasRole('shipper')) || (d.approval === 'approved' && posted(d) && (hasRole('media') || hasRole('snap'))),
     influencers: i => hasRole('approver') || i.nominated_by === uid() || DB.deals.some(d => d.influencer_id === i.id && d.member_id === uid()),
     deal_bank: () => isAdmin(),
+    deal_links: l => isAdmin() || DB.deals.some(d => d.id === l.deal_id && d.member_id === uid()),
     request_reads: r => r.member_id === uid(),
     daily_reports: r => r.member_id === uid() || isAdmin()
   };

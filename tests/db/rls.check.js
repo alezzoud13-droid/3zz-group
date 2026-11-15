@@ -4,7 +4,8 @@ const U={admin:'00000000-0000-0000-0000-00000000000a',mitab:'00000000-0000-0000-
 const cfg={host:process.env.PGHOST||'/tmp/pgd',port:+(process.env.PGPORT||5544),user:'postgres',database:DB};
 async function su(sql,p){const c=new Client(cfg);await c.connect();try{return (await c.query(sql,p)).rows}finally{await c.end()}}
 async function as(who,sql,p){const c=new Client(cfg);await c.connect();try{await c.query('begin');await c.query("set local role "+(who==='anon'?'anon':'authenticated'));if(who!=='anon')await c.query("select set_config('request.jwt.claim.sub',$1,true)",[U[who]]);const r=await c.query(sql,p);await c.query('commit');return {ok:true,rows:r.rows,n:r.rowCount}}catch(e){try{await c.query('rollback')}catch(_){}return {ok:false,err:e.message}}finally{await c.end()}}
-const res=[];const expectBlocked=(name,r)=>{const vuln=r.ok&&(r.n===undefined||r.n>0);res.push([vuln?'VULN':'ok  ',name,vuln?'':(r.err||'0 rows')]);};
+const res=[];
+const tokenOf=async id=>{try{const r=await su("select token from deal_links where deal_id=$1",[id]);if(r.length)return r[0].token}catch(e){}return (await su("select intake_token from deals where id=$1",[id]))[0].intake_token};const expectBlocked=(name,r)=>{const vuln=r.ok&&(r.n===undefined||r.n>0);res.push([vuln?'VULN':'ok  ',name,vuln?'':(r.err||'0 rows')]);};
 const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'rows='+r.n:r.err])};
 (async()=>{
  for(const [k,id] of Object.entries(U))await su("insert into auth.users(id,email) values($1,$2) on conflict do nothing",[id,k+'@x.com']);
@@ -15,10 +16,10 @@ const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'
  // reem deal approved by mitab (legit flow)
  let r=await as('reem',"insert into deals(name,member_id,campaign_id,price) values('مؤثر1',$1,$2,500) returning id",[U.reem,camp]);expectAllowed('creator creates own deal',r);const d1=r.rows[0].id;
  expectAllowed('approver approves',await as('mitab',"update deals set approval='approved',approved_by=$2,approved_at=now() where id=$1",[d1,U.mitab]));
- const tok=(await su("select intake_token from deals where id=$1",[d1]))[0].intake_token;
+ const tok=await tokenOf(d1);
  expectAllowed('influencer intake via link',await as('anon',"select intake_submit($1,'{\"rcv_name\":\"x\",\"address\":\"الرياض\"}'::jsonb,'{\"c\":\"real-iban\"}'::jsonb) as ok where true",[tok]).then(x=>({...x,n:x.ok&&x.rows[0].ok?1:0})));
  // --- attacks ---
- const fresh=async(price=100)=>{const x=await as('reem',"insert into deals(name,member_id,campaign_id,price) values('f',$1,$2,$3) returning id,intake_token",[U.reem,camp,price]);const id=x.rows[0].id;await as('mitab',"update deals set approval='approved',approved_by=$2,approved_at=now() where id=$1",[id,U.mitab]);return {id,tok:x.rows[0].intake_token}};
+ const fresh=async(price=100)=>{const x=await as('reem',"insert into deals(name,member_id,campaign_id,price) values('f',$1,$2,$3) returning id,intake_token",[U.reem,camp,price]);const id=x.rows[0].id;await as('mitab',"update deals set approval='approved',approved_by=$2,approved_at=now() where id=$1",[id,U.mitab]);return {id,tok:await tokenOf(id)}};
  {const F=await fresh();expectBlocked('shipper overwrites bank (IBAN) of someone else deal',await as('saqr',"update deal_bank set cipher='{\"c\":\"saqr-iban\"}' where deal_id=$1",[F.id]));}
  {const F=await fresh();expectBlocked('creator overwrites bank of own approved deal directly (bypassing influencer link)',await as('reem',"update deal_bank set cipher='{\"c\":\"reem-iban\"}' where deal_id=$1",[F.id]));}
  {const F=await fresh();expectBlocked('media buyer inserts bank row for a deal',await as('mb',"insert into deal_bank(deal_id,cipher) values($1,'{}') on conflict (deal_id) do update set cipher='{\"c\":\"mb\"}'",[F.id]));}
@@ -104,6 +105,29 @@ const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'
   res.push([x.rows&&x.rows[0].created_by===U.reem&&(Date.now()-new Date(x.rows[0].created_at))<60000?'ok  ':'VULN','spoofed created_at/created_by on insert ignored','']);}
  {const x=await as('reem',"insert into deals(name,member_id,campaign_id) values('np',$1,$2) returning id",[U.reem,camp]);
   expectBlocked('video approved / posted on a deal that was never approved',await as('mitab',"update deals set video_ok_at=now() where id=$1",[x.rows[0].id]));}
+
+ // ===== round 3 =====
+ res.push(['----','ROUND 3','']);
+ {const i=await as('mitab',"insert into influencers(name,handle,nominated_by,acq_status) values('M1','@m1',$1,'pending') returning id",[U.mitab]);const id=i.rows[0].id;
+  expectBlocked('approver approves own acquisition by moving it to reem',await as('mitab',"update influencers set acq_status='approved',acq_decided_by=$3,acq_decided_at=now(),nominated_by=$2 where id=$1",[id,U.reem,U.mitab]));
+  const j=await as('mitab',"insert into influencers(name,handle,nominated_by,acq_status) values('M2','@m2',$1,'pending') returning id",[U.reem]);
+  if(j.ok){await as('mitab',"update influencers set acq_status='approved' where id=$1",[j.rows[0].id]);expectBlocked('approver takes over an approved file under reem name',await as('mitab',"update influencers set nominated_by=$2 where id=$1",[j.rows[0].id,U.mitab]))}}
+ {const F=await fresh();await as('admin',"update deals set pay_ok_at=now() where id=$1",[F.id]);await as('mitab',"update deals set paid_at=now() where id=$1",[F.id]);
+  expectBlocked('approver clears paid (double payment)',await as('mitab',"update deals set paid_at=null where id=$1",[F.id]));}
+ {const q=await as('reem',"insert into requests(kind,title,from_member,to_member) values('design','r3',$1,$2) returning id",[U.reem,U.saqr]);const id=q.rows[0].id;
+  expectBlocked('requester marks new request done with fake result',await as('reem',"update requests set status='done',done_at=now(),result_url='fake' where id=$1",[id]));
+  expectBlocked('approver delivers someone else request',await as('mitab',"update requests set status='review',result_url='x' where id=$1",[id]));
+  await as('saqr',"update requests set status='doing',started_at=now() where id=$1",[id]);await as('saqr',"insert into request_events(request_id,member_id,type) values($1,$2,'start')",[id,U.saqr]);
+  expectBlocked('requester resets started request to new',await as('reem',"update requests set status='new',started_at=null where id=$1",[id]));
+  expectBlocked('requester deletes request after work started',await as('reem',"delete from requests where id=$1",[id]));}
+ {const F=await fresh();expectBlocked('shipper reads influencer link token',await as('saqr',"select token from deal_links where deal_id=$1",[F.id]));
+  expectAllowed('owner reads own influencer link token',await as('reem',"select token from deal_links where deal_id=$1",[F.id]));
+  expectBlocked('shipper uses influencer link of approved deal (token hidden)',{ok:false,err:'needs token'});}
+ expectBlocked('member calls internal budget function',await as('reem',"select public._check_budget(gen_random_uuid(),$1,1)",[camp]));
+ {const F=await fresh();const r=await su("select approved_by from deals where id=$1",[F.id]);res.push([r[0].approved_by===U.mitab?'ok  ':'VULN','approved_by is always the real approver','']);}
+ {const F=await fresh();await as('saqr',"update deals set shipped_at='2020-01-01' where id=$1",[F.id]);
+  const a=await su("select changes->>'shipped_at' s from audit_log where row_id=$1::text and changes ? 'shipped_at' order by id desc limit 1",[F.id]);
+  res.push([a.length&&!String(a[0].s).startsWith('2020')?'ok  ':'VULN','audit log records the real date, not the forged one',a.length?a[0].s:'none']);}
  // ===== legitimate flows (must keep working) =====
  res.push(['----','LEGIT FLOWS','']);
  {const x=await as('reem',"insert into deals(name,member_id,campaign_id,price,phone,handle,platform,approval,sent_at,rcv_name,address,price_before,decision_reason) values('L',$1,$2,300,'05','@l','تيك توك','pending',now(),'','',400,'') returning id",[U.reem,camp]);expectAllowed('creator nominates (insert like app)',x);const id=x.rows[0].id;
@@ -125,7 +149,7 @@ const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'
   expectAllowed('creator closes own file',await as('reem',"update deals set closed_at=now(),closed_reason='ما رد' where id=$1",[id]));
   expectAllowed('admin reopens',await as('admin',"update deals set closed_at=null,closed_reason='',approval='pending',sent_at=null where id=$1",[id]));}
  {const x=await as('reem',"insert into deals(name,member_id,campaign_id,approval) values('D',$1,$2,'pending') returning id,intake_token",[U.reem,camp]);const id=x.rows[0].id;await as('mitab',"update deals set approval='approved' where id=$1",[id]);
-  const t=x.rows[0].intake_token;expectAllowed('influencer fills link (anon)',await as('anon',"select intake_submit($1,'{\"address\":\"A\"}'::jsonb,'{\"c\":1}'::jsonb) ok",[t]).then(r=>({...r,n:r.ok&&r.rows[0].ok?1:0})));
+  const t=await tokenOf(id);expectAllowed('influencer fills link (anon)',await as('anon',"select intake_submit($1,'{\"address\":\"A\"}'::jsonb,'{\"c\":1}'::jsonb) ok",[t]).then(r=>({...r,n:r.ok&&r.rows[0].ok?1:0})));
   expectBlocked('influencer link works once only',await as('kh',"select intake_submit($1,'{\"address\":\"B\"}'::jsonb,null) ok",[t]).then(r=>({...r,n:r.ok&&r.rows[0].ok?1:0})));
   await as('admin',"update deals set pay_ok_at=now() where id=$1",[id]);
   expectBlocked('link locked after payment approval',await as('anon',"select intake_submit($1,'{}'::jsonb,'{\"c\":2}'::jsonb) ok",[t]).then(r=>({...r,n:r.ok&&r.rows[0].ok?1:0})));}
@@ -137,6 +161,7 @@ const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'
   expectAllowed('doer delivers',await as('saqr',"update requests set status='review',result_url='u' where id=$1",[id]));
   expectAllowed('doer comment',await as('saqr',"insert into request_events(request_id,member_id,type,body) values($1,$2,'comment','x')",[id,U.saqr]));
   expectAllowed('requester returns for fix',await as('reem',"update requests set status='fix',done_at=null,rounds=1 where id=$1",[id]));
+  expectAllowed('doer redelivers after fix',await as('saqr',"update requests set status='review',result_url='u2' where id=$1",[id]));
   expectAllowed('requester approves',await as('reem',"update requests set status='done',done_at=now() where id=$1",[id]));
   expectAllowed('requester approve event',await as('reem',"insert into request_events(request_id,member_id,type) values($1,$2,'approve')",[id,U.reem]));
 }

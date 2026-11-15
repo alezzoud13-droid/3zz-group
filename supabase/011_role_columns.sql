@@ -21,7 +21,7 @@ create or replace function public._check_budget(p_deal uuid, p_campaign uuid, p_
 language plpgsql security definer set search_path = public as $$
 declare b numeric; tot numeric;
 begin
-  select budget into b from campaigns where id = p_campaign;
+  select budget into b from campaigns where id = p_campaign for update;   -- يمنع اعتمادين بنفس اللحظة يتخطون السقف
   if b is null or b <= 0 then return; end if;
   select coalesce(sum(price), 0) into tot from deals
     where campaign_id = p_campaign and approval = 'approved' and closed_at is null and id <> p_deal;
@@ -40,17 +40,17 @@ declare
   creator_cols text[] := array['name','phone','handle','platform','city','acc_type','followers','price','currency','price_note','notes',
     'sent_at','draft_url','draft_at','draft_note','post_url','tt_code','ig_code','sn_code','hook','posted_at','tt_at','ig_at','sn_at',
     'sn_user','planned_date','price_before','ad_type','campaign_id','influencer_id','batch_id',
-    'rcv_name','rcv_phone','rcv_city','address','short_code','country','no_ship','no_pay','closed_at','closed_reason','intake_token'];
+    'rcv_name','rcv_phone','rcv_city','address','short_code','country','no_ship','no_pay','closed_at','closed_reason'];
   approver_cols text[] := array['approved_by','approved_at','decision_reason','draft_feedback','rounds','video_score','video_ok_at','member_id'];
   ship_cols text[] := array['shipped_at','delivered_at','tracking','ship_company','ship_failed_at','ship_note'];
   launch_cols text[] := array['ad_name','live_at','tt_live_at','ig_live_at','sn_live_at'];
-  admin_cols text[] := array['id','pay_ok_at','pay_ok_by','created_by','created_at','intake_at'];
+  admin_cols text[] := array['id','pay_ok_at','pay_ok_by','created_by','created_at','intake_at','intake_token'];
   -- تواريخ الإنجاز: لغير الأدمن تنحفظ بوقت الحفظ الفعلي (ما ينفع تاريخ قديم أو مستقبلي)
   stamp_cols text[] := array['sent_at','draft_at','tt_at','ig_at','sn_at','posted_at','shipped_at','delivered_at','ship_failed_at',
     'live_at','tt_live_at','ig_live_at','sn_live_at','approved_at','video_ok_at','paid_at','closed_at'];
   insert_null text[] := array['approved_by','approved_at','video_ok_at','video_score','shipped_at','delivered_at','ship_failed_at',
     'tt_at','ig_at','sn_at','posted_at','live_at','tt_live_at','ig_live_at','sn_live_at','ad_name','paid_at','pay_ok_at','pay_ok_by',
-    'closed_at','intake_at','draft_at','draft_feedback'];
+    'closed_at','intake_at','draft_at','draft_feedback','tracking','ship_company','ship_note'];
 begin
   if me is null or public.is_admin() or current_setting('app.intake', true) = 'on' then return new; end if;
   appr := public.has_role('approver');
@@ -93,6 +93,7 @@ begin
   end if;
   if old.closed_at is not null and new.closed_at is null and not appr_on then raise exception 'إعادة فتح الملف للمعتمد أو عبدالمحسن'; end if;
   if new.paid_at is distinct from old.paid_at and not appr then raise exception 'تسجيل الدفع للمعتمد أو عبدالمحسن'; end if;
+  if old.paid_at is not null and new.paid_at is distinct from old.paid_at then raise exception 'التراجع عن «تم الدفع» لعبدالمحسن فقط'; end if;
   -- المقطع والنزول بعد اعتماد الترشيح فقط
   if new.approval <> 'approved' and ((new.video_ok_at is not null and old.video_ok_at is null)
      or (new.tt_at is not null and old.tt_at is null) or (new.ig_at is not null and old.ig_at is null) or (new.sn_at is not null and old.sn_at is null)) then
@@ -110,11 +111,13 @@ begin
       n := jsonb_set(n, array[c], to_jsonb(now()));
     end if;
   end loop;
+  if (n -> 'approved_by') is distinct from (o -> 'approved_by') and n ->> 'approved_by' is not null then n := jsonb_set(n, '{approved_by}', to_jsonb(me)); end if;
   new := jsonb_populate_record(new, n);
   return new;
 end $$;
 drop trigger if exists guard_deal_columns on public.deals;
-create trigger guard_deal_columns before insert or update on public.deals for each row execute function public.guard_deal_columns();
+drop trigger if exists a0_guard_deal_columns on public.deals;
+create trigger a0_guard_deal_columns before insert or update on public.deals for each row execute function public.guard_deal_columns();
 
 -- ============ رابط المؤثر: مرة وحدة، ويقفل بعد موافقة الدفع ============
 -- لو احتاج المؤثر يصحح بياناته: عبدالمحسن يفتح الرابط من جديد (يمسح «intake_at» من محرر الجدول).
@@ -161,7 +164,11 @@ begin
     if new.agreed_at is not null then new.agreed_at := now(); end if;
     return new;
   end if;
-  appr_on := public.has_role('approver') and old.nominated_by is distinct from me;
+  appr_on := public.has_role('approver') and old.nominated_by is distinct from me and new.nominated_by is distinct from me;
+  if new.nominated_by is distinct from old.nominated_by and new.nominated_by = me then raise exception 'ما ينفع تنقل ملف مؤثر باسمك'; end if;
+  if new.acq_status is distinct from old.acq_status and new.acq_status in ('approved','rejected','needs_edit') and not appr_on then
+    raise exception 'قرار الاستقطاب للمعتمد، وعلى ملفاتك لعبدالمحسن';
+  end if;
   if (new.acq_decided_by is distinct from old.acq_decided_by or new.acq_decided_at is distinct from old.acq_decided_at) and not appr_on then
     raise exception 'قرار الاستقطاب للمعتمد، وعلى ملفاتك لعبدالمحسن';
   end if;
@@ -180,7 +187,8 @@ end $$;
 drop trigger if exists guard_infl_agreed on public.influencers;
 drop function if exists public.guard_infl_agreed();
 drop trigger if exists guard_infl_columns on public.influencers;
-create trigger guard_infl_columns before insert or update on public.influencers for each row execute function public.guard_infl_columns();
+drop trigger if exists a0_guard_infl_columns on public.influencers;
+create trigger a0_guard_infl_columns before insert or update on public.influencers for each row execute function public.guard_infl_columns();
 
 -- ============ الحصص ============
 create or replace function public.guard_quota_keys() returns trigger
@@ -250,11 +258,25 @@ begin
     requester := old.from_member = me;
     if requester then
       if new.to_member is distinct from old.to_member and old.status not in ('new','fix') then raise exception 'تغيير المطلوب منه قبل ما يبدأ فقط'; end if;
+      if public._chg(to_jsonb(old), to_jsonb(new), array['result_url','started_at']) is not null then raise exception 'التسليم يكتبه المطلوب منه'; end if;
+      if old.kind = 'quota' and (public._chg(to_jsonb(old), to_jsonb(new), array['qty','campaign_id']) is not null
+         or (new.status is distinct from old.status and new.status <> 'cancelled')) then raise exception 'طلب الزيادة: تقدر تلغيه بس'; end if;
+      -- الطالب: يلغي الطلب المفتوح، ويعتمد أو يرجّع بعد التسليم، ويرجّع المنتهي للتعديل
+      if new.status is distinct from old.status and not (
+           (new.status = 'cancelled' and old.status not in ('done','cancelled'))
+        or (old.status = 'review' and new.status in ('done','fix'))
+        or (old.status = 'done' and new.status = 'fix')) then
+        raise exception 'هذا التغيير في حالة الطلب مو لك';
+      end if;
+      if old.status in ('done','cancelled') and new.status = old.status and public._chg(to_jsonb(old), to_jsonb(new), array['title','details','ref_url','size','due','deal_id']) is not null then
+        raise exception 'الطلب منتهي';
+      end if;
     elsif boss and old.kind = 'quota' then
       if public._chg(to_jsonb(old), to_jsonb(new), array['title','details','ref_url','size','to_member','due','deal_id','campaign_id','qty','result_url','started_at']) is not null
          or (old.status in ('done','cancelled') and new.status is distinct from old.status) then raise exception 'طلب الزيادة: القرار بس'; end if;
     else
       -- المطلوب منه: يبدأ ويسلّم بس
+      if old.to_member is distinct from me then raise exception 'هذا الطلب مو مطلوب منك'; end if;
       if public._chg(to_jsonb(old), to_jsonb(new), array['title','details','ref_url','size','to_member','due','deal_id','campaign_id','qty','done_at','rounds']) is not null
          or (new.status is distinct from old.status and (new.status not in ('doing','review') or old.status in ('done','cancelled'))) then
         raise exception 'اعتماد الطلب أو إلغاؤه أو تعديله لصاحب الطلب';
@@ -274,14 +296,16 @@ begin
   end if;
 end $$;
 drop trigger if exists guard_request on public.requests;
-create trigger guard_request before insert or update on public.requests for each row execute function public.guard_request();
+drop trigger if exists a0_guard_request on public.requests;
+create trigger a0_guard_request before insert or update on public.requests for each row execute function public.guard_request();
 drop trigger if exists guard_request_event on public.request_events;
 create trigger guard_request_event before insert on public.request_events for each row execute function public.guard_request();
 
 -- حذف الطلب: صاحبه قبل ما يبدأ فيه أحد (أو عبدالمحسن)
 drop policy if exists r_del on public.requests;
 create policy r_del on public.requests for delete using (
-  public.is_admin() or (from_member = auth.uid() and status = 'new' and started_at is null));
+  public.is_admin() or (from_member = auth.uid() and status = 'new' and started_at is null
+    and not exists (select 1 from public.request_events e where e.request_id = requests.id and e.type <> 'created')));
 
 -- ============ تقرير اليوم: يومه أو اليوم اللي قبله (بتوقيت الرياض) ============
 create or replace function public.guard_daily() returns trigger
@@ -295,3 +319,76 @@ begin
 end $$;
 drop trigger if exists guard_daily on public.daily_reports;
 create trigger guard_daily before insert or update on public.daily_reports for each row execute function public.guard_daily();
+
+-- ============ أدوات داخلية: ما تنستدعى من برّا ============
+revoke all on function public._chg(jsonb, jsonb, text[]) from public, anon, authenticated;
+revoke all on function public._check_budget(uuid, uuid, numeric) from public, anon, authenticated;
+
+-- ============ رابط المؤثر في جدول خاص: يشوفه صاحب الترشيح وعبدالمحسن فقط ============
+-- قبل: رمز الرابط كان خانة في «deals»، فالشحن والميديا يقدرون يقرونه ويعبّون الرابط قبل المؤثر بآيبانهم.
+-- الروابط اللي انرسلت للمؤثرين تبقى شغالة (نفس الرمز ينتقل).
+create table if not exists public.deal_links (
+  deal_id uuid primary key references public.deals(id) on delete cascade,
+  token text not null unique default encode(gen_random_bytes(12), 'hex'),
+  created_at timestamptz not null default now()
+);
+insert into public.deal_links(deal_id, token)
+  select id, intake_token from public.deals where coalesce(intake_token, '') <> ''
+on conflict (deal_id) do nothing;
+insert into public.deal_links(deal_id) select id from public.deals d where not exists (select 1 from public.deal_links l where l.deal_id = d.id)
+on conflict (deal_id) do nothing;
+alter table public.deals alter column intake_token drop default;
+do $$ begin
+  perform set_config('app.intake', 'on', true);
+  update public.deals set intake_token = null where intake_token is not null;
+end $$;
+
+create or replace function public.deal_link_new() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into deal_links(deal_id) values (new.id) on conflict (deal_id) do nothing;
+  return new;
+end $$;
+drop trigger if exists deal_link_new on public.deals;
+create trigger deal_link_new after insert on public.deals for each row execute function public.deal_link_new();
+
+alter table public.deal_links enable row level security;
+grant select on public.deal_links to authenticated;
+revoke all on public.deal_links from anon;
+drop policy if exists dl_sel on public.deal_links;
+create policy dl_sel on public.deal_links for select using (
+  public.is_admin() or exists (select 1 from public.deals d where d.id = deal_id and d.member_id = auth.uid()));
+
+create or replace function public.intake_get(p_token text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('name', d.name, 'campaign', c.name, 'done', d.intake_at is not null,
+                            'no_pay', d.no_pay, 'no_ship', d.no_ship, 'bank_pub', (select value from settings where key='bank_pub'))
+  from deal_links l join deals d on d.id = l.deal_id left join campaigns c on c.id = d.campaign_id
+  where l.token = p_token and d.approval = 'approved' and d.closed_at is null
+$$;
+create or replace function public.intake_submit(p_token text, p jsonb, p_cipher jsonb) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  select d.id into v_id from deal_links l join deals d on d.id = l.deal_id
+    where l.token = p_token and d.approval = 'approved' and d.closed_at is null
+      and d.intake_at is null and d.pay_ok_at is null and d.paid_at is null
+    for update of d;
+  if v_id is null then return false; end if;
+  perform set_config('app.intake', 'on', true);
+  update deals set rcv_name = left(coalesce(p->>'rcv_name',''),120), rcv_phone = left(coalesce(p->>'rcv_phone',''),30),
+    rcv_city = left(coalesce(p->>'rcv_city',''),80), address = left(coalesce(p->>'address',''),400),
+    short_code = left(coalesce(p->>'short_code',''),20), country = left(coalesce(p->>'country','السعودية'),60),
+    intake_at = now()
+  where id = v_id;
+  if p_cipher is not null then
+    insert into deal_bank(deal_id, cipher) values (v_id, p_cipher)
+    on conflict (deal_id) do update set cipher = excluded.cipher, created_at = now();
+  end if;
+  perform set_config('app.intake', 'off', true);
+  return true;
+end $$;
+revoke all on function public.intake_get(text) from public;
+revoke all on function public.intake_submit(text, jsonb, jsonb) from public;
+grant execute on function public.intake_get(text) to anon, authenticated;
+grant execute on function public.intake_submit(text, jsonb, jsonb) to anon, authenticated;

@@ -95,7 +95,7 @@ const optsBlank = (list, sel, blank) => `<option value="">${blank || 'اختر'}
 
 /* ================= الحالة ================= */
 const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/');
-const S = { reads: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, kpi: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
+const S = { reads: {}, links: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, kpi: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
 const mem = id => S.members.find(m => m.id === id);
 const memName = id => (mem(id) || {}).name || '—';
 const active = () => S.members.filter(m => m.active);
@@ -144,7 +144,9 @@ function lateness(d, i) { if (i < 0 || i >= STEPS.length || isParked(d)) return 
 const draftPending = d => !!(d.draft_at && !d.video_ok_at && !allDelivered(d));
 const adName = d => [camp(d.campaign_id).name, d.name, d.hook, memName(d.member_id)].map(x => String(x || '').trim()).filter(Boolean).join(' | ');
 const adNameFor = (d, p) => adName(d) + ' | ' + PL[p] + (p === 'sn' ? (d.sn_user ? ' | ' + d.sn_user : '') : (d[p + '_code'] ? ' | ' + d[p + '_code'] : ''));
-const intakeLink = d => location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'intake.html?t=' + d.intake_token;
+// رمز رابط المؤثر في جدول خاص (deal_links) يشوفه صاحب الترشيح وعبدالمحسن فقط — تحديث 11
+const intakeLink = d => { const t = S.links[d.id] || d.intake_token; return t ? location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'intake.html?t=' + t : ''; };
+async function loadLink(d) { if (S.links[d.id]) return; const { data } = await sb.from('deal_links').select('deal_id,token').eq('deal_id', d.id).maybeSingle(); if (data && data.token) { S.links[d.id] = data.token; if (document.getElementById('dClose')) openDeal(d.id); } }
 const waLink = (phone, txt) => { let p = String(phone || '').replace(/\D/g, '').replace(/^00/, '').replace(/^0(?=5)/, '966'); if (/^5\d{8}$/.test(p)) p = '966' + p; if (p.length < 9) p = ''; return p ? 'https://wa.me/' + p + '?text=' + encodeURIComponent(txt) : ''; };
 const safeUrl = u => /^https?:\/\/\S+$/i.test(String(u || '').trim()) ? String(u).trim() : '';
 /* روابط حسابات المؤثر (تيك توك، سناب، انستقرام، يوتيوب) تنفتح في تبويب جديد */
@@ -162,7 +164,7 @@ const isContinuing = i => !!i && S.deals.some(d => d.influencer_id === i.id && a
 /* ================= البيانات ================= */
 async function q(p) { const { data, error } = await p; if (error) { console.warn(error); toast(friendly(error), true); return null; } return data ?? true; }
 async function loadAll() {
-  const [m, c, s, d, r, i, qt, rd] = await Promise.all([
+  const [m, c, s, d, r, i, qt, rd, lk] = await Promise.all([
     sb.from('members').select('*').order('name'),
     sb.from('campaigns').select('*').order('created_at', { ascending: false }),
     sb.from('settings').select('*'),
@@ -170,8 +172,10 @@ async function loadAll() {
     sb.from('requests').select('*').order('created_at', { ascending: false }).limit(3000),
     sb.from('influencers').select('*').order('created_at', { ascending: false }).limit(10000),
     sb.from('quotas').select('*'),
-    sb.from('request_reads').select('request_id,seen_at')
+    sb.from('request_reads').select('request_id,seen_at'),
+    sb.from('deal_links').select('deal_id,token').limit(10000)
   ]);
+  S.links = {}; for (const x of ((lk && lk.data) || [])) S.links[x.deal_id] = x.token;
   S.members = m.data || []; S.camps = c.data || []; S.deals = d.data || []; S.reqs = r.data || []; S.infl = i.data || []; S.quotas = qt.data || []; S.reads = {}; for (const x of (rd.data || [])) S.reads[x.request_id] = x.seen_at; for (const x of S.reqs) if (!(x.id in S.notified)) S.notified[x.id] = x.last_event_at; if (!S.lastPoll) S.lastPoll = nowIso();
   for (const x of (s.data || [])) { if (x.key === 'sla') S.sla = { ...DEF_SLA, ...x.value }; if (x.key === 'daily_tasks') S.tasks = x.value || {}; if (x.key === 'kpi') S.kpi = x.value || {}; if (x.key === 'bank_pub') S.bankPub = x.value; }
   S.me = S.members.find(x => x.id === S.user.id) || S.me;
@@ -850,7 +854,7 @@ function openDeal(id) {
   const secWho = j => STEPS[j].k === 'appr' ? apprFor(d.member_id) : STEPS[j].k === 'video' ? 'صانع المحتوى + ' + apprFor(d.member_id) : stepWho(STEPS[j]);
   const sec = (j, body, meta) => `<details class="sec ${j < i || i === STEPS.length ? 'd' : j === i ? 'c' : ''}" ${j === i ? 'open' : ''}><summary><span class="idx">${j + 1}</span><span class="ttl">${STEPS[j].n} <span class="muted small">· ${esc(secWho(j))}</span></span><span class="meta">${meta || ''}</span></summary><div class="body">${j === i ? `<div class="note small"><b>وش بعد؟</b> ${NEXT[STEPS[j].k]}</div>` : ''}${body}</div></details>`;
   const v = k => esc(d[k] ?? '');
-  const link = intakeLink(d);
+  const link = intakeLink(d); if (!link && mine && d.approval === 'approved') loadLink(d);
   const waIntake = waLink(d.phone || d.rcv_phone, `هلا ${d.name}، نورتنا 🌹 عبّ بياناتك للشحن والتحويل من هذا الرابط: ${link}`);
   const platCard = p => `<div class="card ${delivered(d, p) ? 'ok' : ''}"><div class="hd"><b>${PL[p]}</b>${delivered(d, p) ? `<span class="pill good">نزل ${dShort(d[p + '_at'])}</span>` : '<span class="pill">ما نزل</span>'}${launched(d, p) ? `<span class="pill good">انطلق ${dShort(d[p + '_live_at'])}</span>` : ''}</div>
      <div class="grid2">${p === 'sn' ? `<div class="field"><label>يوزر سناب شات *</label><input type="text" id="f_sn_user" dir="ltr" value="${v('sn_user')}"></div><div class="field"><label>رابط أو كود سناب (اختياري)</label><input type="text" id="f_sn_code" dir="ltr" value="${v('sn_code')}"></div>`
