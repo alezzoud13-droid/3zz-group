@@ -472,6 +472,8 @@ function renderAcq() {
 ['aQ', 'aSt', 'aMem', 'aType'].forEach(id => $(id).addEventListener('input', renderAcq));
 
 /* ================= ترشيح للحملة (دفعة) ================= */
+const campSpend = cid => S.deals.filter(d => d.campaign_id === cid && d.approval === 'approved' && !d.closed_at).reduce((s, d) => s + (Number(d.price) || 0), 0);
+const budgetPct = c => { const b = Number(c.budget) || 0; return b ? Math.round(campSpend(c.id) / b * 100) : null; };
 function campStats(cid, mid) {
   const D = S.deals.filter(d => d.campaign_id === cid && (!mid || d.member_id === mid));
   const used = D.filter(d => !d.closed_at && d.approval !== 'rejected').length;
@@ -608,13 +610,16 @@ function renderCamps() {
       <div class="tile"><span class="l">استلموا</span><span class="v">${deliv}</span></div>
       <div class="tile"><span class="l">نشروا</span><span class="v">${posted}</span></div>
       <div class="tile"><span class="l">مبالغ المعتمدين</span><span class="v">${fmt(spend)}</span></div>
+      ${Number(c.budget) > 0 ? `<div class="tile"><span class="l">سقف الصرف</span><span class="v">${fmt(Number(c.budget))}</span></div><div class="tile"><span class="l">المتبقي من السقف</span><span class="v" style="${Number(c.budget) - spend < 0 ? 'color:var(--bad)' : ''}">${fmt(Number(c.budget) - spend)}</span></div>` : ''}
      </div>
+     ${budgetPct(c) != null && budgetPct(c) >= 80 ? `<div class="${budgetPct(c) >= 100 ? 'dup' : 'note'}">${budgetPct(c) >= 100 ? '⛔' : '⚠️'} الصرف المعتمد وصل ${budgetPct(c)}٪ من سقف الحملة (${fmt(campSpend(c.id))} من ${fmt(Number(c.budget))}). ${budgetPct(c) >= 100 ? 'أي اعتماد جديد مرفوض إلا من عبدالمحسن أو بعد رفع السقف.' : 'قربتوا من السقف — راجعوا قبل اعتمادات جديدة.'}</div>` : ''}
      ${target ? `<div class="row small"><span class="muted">التقدم نحو المطلوب (المعتمد)</span><div class="prog" style="flex:1"><i style="width:${Math.min(100, pct(st.approved.length, target))}%"></i></div><b>${pct(st.approved.length, target)}٪</b></div>` : ''}
      ${ap || adm ? '' : '<div class="muted small">أرقام الترشيح والاعتماد والشحن والنشر هنا لترشيحاتك أنت فقط.</div>'}
      ${adm ? `<details><summary class="small" style="cursor:pointer;color:var(--accent)">إعدادات الحملة (عبدالمحسن)</summary><div class="grid3" style="margin-top:10px">
        <div class="field"><label>الاسم</label><input type="text" data-k="name" value="${esc(c.name)}"></div>
        <div class="field"><label>المنتج</label><input type="text" data-k="product" value="${esc(c.product)}"></div>
        <div class="field"><label>العدد المطلوب</label><input type="number" min="0" data-k="target_total" value="${c.target_total ?? ''}"></div>
+       <div class="field"><label>سقف الصرف (ريال)</label><input type="number" min="0" data-k="budget" value="${c.budget ?? ''}"></div>
        <div class="field"><label>الحالة</label><select data-k="status">${Object.entries(CAMP_ST).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
       </div><button class="btn sm primary" data-csave type="button">حفظ</button></details>` : ''}
      <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر الاعتماد</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.sent.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
@@ -623,7 +628,7 @@ function renderCamps() {
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
 }
 $('cEnded').addEventListener('input', renderCamps);
-$('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
+$('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div><div class="field"><label for="nc_b">سقف الصرف بالريال (اختياري)</label><input type="number" min="0" id="nc_b"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, budget: Number(box.querySelector('#nc_b').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
 $('cList').addEventListener('click', async e => {
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
   const box = e.target.closest('[data-camp]'); if (!box) return; const cid = box.dataset.camp;
@@ -637,13 +642,13 @@ $('cList').addEventListener('click', async e => {
 
 /* ================= مهامي ================= */
 const QL = {
-  members: 'حسابات جديدة تنتظر التفعيل', acq_review: 'استقطاب ينتظر اعتمادك', appr: 'ترشيحات حملات تنتظر اعتمادك', quota_req: 'طلبات زيادة حصة',
+  members: 'حسابات جديدة تنتظر التفعيل', budget_alert: 'حملات قربت من سقف الصرف أو تجاوزته', acq_review: 'استقطاب ينتظر اعتمادك', appr: 'ترشيحات حملات تنتظر اعتمادك', quota_req: 'طلبات زيادة حصة',
   acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
   acq_contact: 'معتمد: تواصل وفاوض', intake: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', ship_send: 'جاهزة للشحن', ship_wait: 'في الطريق: سجّل الوصول', ship_fail: 'تعذّر التسليم: تابعها',
   video: 'وصله المنتج: أرسل المقطع الخام للمراجعة', video_fix: 'مقاطع رجعت لك للتعديل', draft: 'مقاطع خام تنتظر اعتمادك', post: 'المقطع معتمد: سجّل النزول والكود لكل منصة',
   launch: 'نزل: شغّل الإعلان', snap_follow: 'محتوى نزل: سلّمه للميديا باير وتابع التشغيل', req_in: 'طلبات عليك', req_fix: 'طلبات رجعت لك للتعديل', req_new: 'تحديثات جديدة على طلباتك (ردود، تعديلات، تسليمات)', req_review: 'طلبات سلّموها لك: راجعها', pay: 'تنتظر موافقتك على الدفع', pay_go: 'معتمدة للدفع: نزّل كشف الدفع وأرسله للمالية، وبعد التحويل علّم «تم الدفع»', park: 'احتياط'
 };
-const QO = ['members', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'launch', 'snap_follow', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'pay_go', 'park'];
+const QO = ['members', 'budget_alert', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'launch', 'snap_follow', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'pay_go', 'park'];
 const BULK = {
   appr: ['اعتماد', () => ({ approval: 'approved', approved_at: nowIso(), approved_by: S.me.id, decision_reason: '' })],
   ship_send: ['تم الشحن اليوم', () => ({ shipped_at: nowIso() })],
@@ -680,6 +685,8 @@ function queuesFor(id) {
     if (d.member_id === id) add(k, { d, i });
   }
   if (id !== 'admin' && strictRole(id, 'creator')) for (const c of S.camps.filter(c => c.status === 'active')) { const qn = quotaOf(c.id, id); const s = campStats(c.id, id); if (qn > s.used) add('camp_quota', { c, left: qn - s.used }); }
+  /* تنبيه سقف الصرف: لعبدالمحسن ومتعب عند 80% فأكثر */
+  if (id === 'admin' || isAp) for (const c of S.camps.filter(c => (c.status || 'active') === 'active' && Number(c.budget) > 0)) { const bp = budgetPct(c); if (bp != null && bp >= 80) add('budget_alert', { c, pct: bp }); }
   for (const r of S.reqs) {
     if (id === S.me.id && unread(r)) add('req_new', { r });
     if (r.status === 'done' || r.status === 'cancelled') continue;
@@ -692,7 +699,7 @@ function queuesFor(id) {
   for (const k in G) G[k].sort((a, b) => (a.d && b.d) ? stepAge(b.d, b.i) - stepAge(a.d, a.i) : 0);
   return G;
 }
-function countFor(id) { const G = queuesFor(id); return Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).reduce((a, [, v]) => a + v.length, 0); }
+function countFor(id) { const G = queuesFor(id); return Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert'].includes(k)).reduce((a, [, v]) => a + v.length, 0); }
 function updateMineCount() { if (!S.me) return; const n = countFor(S.me.id) + (isAdmin() ? countFor('admin') : 0); $('mineCnt').hidden = !n; $('mineCnt').textContent = n; const u = S.reqs.filter(unread).length; $('reqCnt').hidden = !u; $('reqCnt').textContent = u; document.title = (u ? `(${u}) ` : '') + 'أداء فريق العز'; }
 function dealRow(x, bulk, k) {
   const { d, i, p } = x; const late = lateness(d, i); const age = p ? ageOf(d[p + '_at']) : stepAge(d, i);
@@ -721,7 +728,7 @@ function renderMine() {
   if (isAdmin()) { const v = as.value || S.me.id; as.innerHTML = `<option value="${S.me.id}">أنا</option><option value="team">ملخص الفريق</option>` + active().filter(m => m.id !== S.me.id).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join(''); as.value = [...as.options].some(o => o.value === v) ? v : S.me.id; id = as.value; }
   if (id === 'team') return renderTeam();
   const G = queuesFor(id); if (id === S.me.id && isAdmin()) { const A = queuesFor('admin'); for (const k in A) G[k] = (G[k] || []).concat(A[k]); }
-  const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
+  const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
   $('mineTitle').textContent = id === S.me.id ? 'مهامي' : 'مهام ' + memName(id);
   $('mineSub').textContent = total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : 'ما عندك شي معلّق.';
   /* عرض فقط: نفس القوائم ونفس العدّ، مرتبة في أقسام، مع تصفية بالمتأخر وآخر يوم */
@@ -743,6 +750,7 @@ function renderMine() {
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
     else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي لك ${left} ترشيح</div></div><div class="acts"><button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button></div></div>`).join('');
+    else if (k === 'budget_alert') rows = L.map(({ c, pct: bp }) => `<div class="qrow ${bp >= 100 ? 'late' : ''}"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">المعتمد ${fmt(campSpend(c.id))} من سقف ${fmt(Number(c.budget))} ريال${bp >= 100 ? ' — الاعتمادات الجديدة مرفوضة إلا منك أو بعد رفع السقف' : ''}</div></div><div class="acts"><span class="pill ${bp >= 100 ? 'bad' : 'warn'}">${bp}٪</span><a class="btn sm" href="#camps">افتح الحملة</a></div></div>`).join('');
     else if (L[0].i && L[0].i.acq_status !== undefined && !L[0].d) rows = L.map(x => inflRow(x.i)).join('');
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }
@@ -752,7 +760,7 @@ function renderMine() {
 }
 function renderTeam() {
   $('mineTitle').textContent = 'ملخص الفريق'; $('mineSub').textContent = 'كم شي ينتظر كل شخص، وكم منه متأخر.';
-  const rows = active().map(m => { const G = queuesFor(m.id); let n = 0, l = 0; for (const k in G) { if (['park', 'camp_quota', 'acq_contact'].includes(k)) continue; n += G[k].length; l += G[k].filter(x => (x.d && lateness(x.d, x.i) === 'late') || (x.r && x.r.due && x.r.due < today())).length; } return { m, n, l }; }).sort((a, b) => b.l - a.l || b.n - a.n);
+  const rows = active().map(m => { const G = queuesFor(m.id); let n = 0, l = 0; for (const k in G) { if (['park', 'camp_quota', 'acq_contact', 'budget_alert'].includes(k)) continue; n += G[k].length; l += G[k].filter(x => (x.d && lateness(x.d, x.i) === 'late') || (x.r && x.r.due && x.r.due < today())).length; } return { m, n, l }; }).sort((a, b) => b.l - a.l || b.n - a.n);
   $('mineBody').innerHTML = `<div class="tw"><table><thead><tr><th>الشخص</th><th>الدور</th><th class="num">ينتظر</th><th class="num">متأخر</th></tr></thead><tbody>${rows.map(x => `<tr class="click" data-as="${x.m.id}"><td>${esc(x.m.name)}</td><td class="small muted">${esc((x.m.roles || []).map(r => ROLES[r]).join(' + '))}</td><td class="num">${x.n}</td><td class="num">${x.l ? `<span class="pill bad">${x.l}</span>` : '<span class="pill good">0</span>'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 $('mineAs').addEventListener('change', renderMine);
@@ -947,7 +955,9 @@ function openDeal(id) {
           payok: 'اعتمدت الدفع ✓ — انتقلت لمتعب في «معتمدة للدفع»: ينزّل الكشف ويرسله للمالية',
           paid: d.paid_at ? 'ترجّع عن تسجيل الدفع' : 'انسجّل الدفع ✓ — اكتمل الملف مالياً'
         };
-        toast(AM[a] || (a.startsWith('dl_') ? 'انسجّل النزول ✓ — راحت للميديا باير للتشغيل، وتطلع لزياد في شيت التشغيل' : 'انحفظ'));
+        let _m = AM[a] || (a.startsWith('dl_') ? 'انسجّل النزول ✓ — راحت للميديا باير للتشغيل، وتطلع لزياد في شيت التشغيل' : 'انحفظ');
+        if (a === 'approve') { const _c = camp(d.campaign_id); const _bp = _c.id ? budgetPct(_c) : null; if (_bp != null && _bp >= 80) _m += ` — ${_bp >= 100 ? '⛔' : '⚠️'} الحملة وصلت ${_bp}٪ من سقف الصرف`; }
+        toast(_m);
         openDeal(d.id);
       }
     });
