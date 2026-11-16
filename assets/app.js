@@ -525,12 +525,13 @@ function openCampNom(cid, preInfl) {
     return modal(`<h2>ترشيح للحملة</h2><div class="field"><label for="cn_c">اختر الحملة</label><select id="cn_c">${live.map(c => `<option value="${c.id}">${esc(c.name)} — حصتك ${quotaOf(c.id, S.me.id)}</option>`).join('')}</select></div><div class="row"><button class="btn primary" id="cn_go" type="button">متابعة</button><button class="btn" id="cn_x" type="button">إلغاء</button></div>`, () => { $('cn_go').onclick = () => openCampNom($('cn_c').value, preInfl); $('cn_x').onclick = closeModal; }, true);
   }
   const c = camp(cid), me = S.me.id, quota = quotaOf(cid, me), st = campStats(cid, me);
-  const fixes = st.fix, drafts = st.drafts, sentN = st.sent.length - fixes.length - st.rejected.length;
+  /* نفس حسبة «مهامي»: المرفوض والمغلق ما يستهلكون الحصة */
+  const fixes = st.fix, drafts = st.drafts, sentN = st.sent.filter(d => !d.closed_at && !['rejected', 'needs_edit'].includes(d.approval)).length;
   const free = Math.max(0, quota - st.used);
   let n = 0; const cards = [];
   fixes.forEach(d => cards.push(nomCard(++n, d))); drafts.forEach(d => cards.push(nomCard(++n, d)));
   for (let k = 0; k < free; k++) cards.push(nomCard(++n, null, k === 0 ? preInfl : null));
-  modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${quota} · أرسلت ${sentN} · ${fixes.length ? fixes.length + ' ترجع للتعديل · ' : ''}الباقي ${Math.max(0, quota - sentN)}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
+  modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${quota} · أرسلت ${sentN} · ${fixes.length ? fixes.length + ' ترجع للتعديل · ' : ''}الباقي ${Math.max(0, quota - st.used)}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
    ${!quota ? `<div class="dup">ما عندك حصة في هذي الحملة${isAdmin() ? ' — حدد لنفسك حصة من جدول الحصص في تبويب «الحملات»' : `. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية»`}.</div>` : ''}
    ${!cards.length && quota ? `<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من ${esc(apprFor(S.me.id))}.</div>` : ''}
    <div id="cn_cards" style="display:grid;gap:12px">${cards.join('')}</div>
