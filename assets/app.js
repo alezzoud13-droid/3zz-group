@@ -179,7 +179,7 @@ async function loadAll() {
   S.links = {}; for (const x of ((lk && lk.data) || [])) S.links[x.deal_id] = x.token;
   S.members = m.data || []; S.camps = c.data || []; S.deals = d.data || []; S.reqs = r.data || []; S.infl = i.data || []; S.quotas = qt.data || []; S.reads = {}; for (const x of (rd.data || [])) S.reads[x.request_id] = x.seen_at; for (const x of S.reqs) if (!(x.id in S.notified)) S.notified[x.id] = x.last_event_at; if (!S.lastPoll) S.lastPoll = nowIso();
   for (const x of (s.data || [])) { if (x.key === 'sla') S.sla = { ...DEF_SLA, ...x.value }; if (x.key === 'daily_tasks') S.tasks = x.value || {}; if (x.key === 'kpi') S.kpi = x.value || {}; if (x.key === 'bank_pub') S.bankPub = x.value; }
-  S.me = S.members.find(x => x.id === S.user.id) || S.me;
+  if (!S.realMe) S.me = S.members.find(x => x.id === S.user.id) || S.me;   // في وضع الفحص نثبت الهوية المعروضة
 }
 function upsertLocal(list, row) { const i = list.findIndex(x => x.id === row.id); if (i >= 0) list[i] = row; else list.unshift(row); return row; }
 async function saveDeal(id, ch) { const r = id ? await q(sb.from('deals').update(ch).eq('id', id).select().single()) : await q(sb.from('deals').insert(ch).select().single()); return r ? upsertLocal(S.deals, r) : null; }
@@ -637,6 +637,22 @@ function renderCamps() {
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
 }
 $('cTabs').addEventListener('click', e => { const b = e.target.closest('[data-cv]'); if (!b) return; S.campView = b.dataset.cv; renderCamps(); });
+
+/* ===== وضع الفحص: عبدالمحسن يدخل بعين أي موظف ويجرب أزراره. يختفي بتحديث الصفحة. =====
+   تنبيه: القاعدة تتعامل مع الجلسة كأدمن، فحراس الصلاحيات (منع الاعتماد الذاتي وغيره) ما ينفعّلون في هذا الوضع. */
+function actAs(id) {
+  if (id) { if (!S.realMe) S.realMe = S.me; S.me = mem(id) || S.me; }
+  else { if (S.realMe) S.me = S.realMe; S.realMe = null; }
+  $('actBar').hidden = !S.realMe; if (S.realMe) $('actName').textContent = S.me.name || '';
+  $('whoName').textContent = S.me.name || S.me.email;
+  document.querySelectorAll('.adm').forEach(el => el.hidden = !isAdmin());
+  S.campView = 'active'; S.reqView = 'open'; const as = $('mineAs'); if (as) as.value = S.me.id;
+  toast(S.realMe ? `دخلت بعين ${S.me.name} — أي زر تضغطه ينفذ فعلياً` : 'رجعت لحسابك');
+  if (location.hash !== '#mine') location.hash = '#mine'; else render();
+  updateMineCount();
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-act-as]'); if (b && isAdmin()) actAs(b.dataset.actAs); });
+$('actExit').onclick = () => actAs(null);
 $('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div><div class="field"><label for="nc_b">سقف الصرف بالريال (اختياري)</label><input type="number" min="0" id="nc_b"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, budget: Number(box.querySelector('#nc_b').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
 $('cList').addEventListener('click', async e => {
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
@@ -739,7 +755,7 @@ function renderMine() {
   if (id === 'team') return renderTeam();
   const G = queuesFor(id); if (id === S.me.id && isAdmin()) { const A = queuesFor('admin'); for (const k in A) G[k] = (G[k] || []).concat(A[k]); }
   const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
-  $('mineTitle').textContent = id === S.me.id ? 'مهامي' : 'مهام ' + memName(id);
+  $('mineTitle').innerHTML = id === S.me.id ? 'مهامي' : `مهام ${esc(memName(id))} ${isAdmin() && !S.realMe ? `<button class="btn sm" data-act-as="${id}" type="button">ادخل بعينه (وضع الفحص)</button>` : ''}`;
   const foreign = id !== S.me.id;
   $('mineSub').textContent = (total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : foreign ? 'ما عنده شي معلّق.' : 'ما عندك شي معلّق.') + (foreign ? ' أنت تطّلع على مهامه فقط — الترشيح من حصته يسويه هو من حسابه.' : '');
   /* عرض فقط: نفس القوائم ونفس العدّ، مرتبة في أقسام، مع تصفية بالمتأخر وآخر يوم */
@@ -1075,13 +1091,19 @@ function reqRow(r) {
 }
 function renderReqs() {
   const allOpt = $('rScope').querySelector('[value=all]'); if (allOpt && !(isAdmin() || isApprover())) allOpt.remove();   // «الكل» لعبدالمحسن ومتعب فقط — والقاعدة نفسها ما ترجع غير طلبات الشخص
-  const sc = $('rScope').value, dn = $('rDone').checked, me = S.me.id;
-  const L = S.reqs.filter(r => (sc === 'all' || (sc === 'me' ? involved(r) : sc === 'to' ? (r.to_member === me || (r.kind === 'quota' && isApprover())) : r.from_member === me)) && (dn || !['done', 'cancelled'].includes(r.status) || unread(r)))
+  const sc = $('rScope').value, me = S.me.id;
+  S.reqView = S.reqView || 'open';
+  const isDoneR = r => ['done', 'cancelled'].includes(r.status);
+  const base = S.reqs.filter(r => (sc === 'all' || (sc === 'me' ? involved(r) : sc === 'to' ? (r.to_member === me || (r.kind === 'quota' && isApprover())) : r.from_member === me)));
+  const cOpen = base.filter(r => !isDoneR(r)).length, cDone = base.length - cOpen;
+  $('rTabs').innerHTML = [['open', 'الشغالة', cOpen], ['done', 'المنتهية والملغية', cDone]].map(([k, n, c]) => `<button class="btn sm ${S.reqView === k ? 'primary' : ''}" data-rv="${k}" type="button">${n}${c ? ` (${c})` : ''}</button>`).join('');
+  const L = base.filter(r => S.reqView === 'done' ? isDoneR(r) : (!isDoneR(r) || unread(r)))
     .sort((a, b) => (unread(b) - unread(a)) || (tms(b.last_event_at || b.created_at) - tms(a.last_event_at || a.created_at)));
   $('rList').innerHTML = L.length ? `<div style="display:grid;gap:8px">${L.map(reqRow).join('')}</div>` : '<div class="empty">ما فيه طلبات هنا.</div>';
   const nb = $('notifBtn'); if (nb) nb.hidden = !('Notification' in window) || Notification.permission !== 'default';
 }
-['rScope', 'rDone'].forEach(id => $(id).addEventListener('input', renderReqs));
+$('rScope').addEventListener('input', renderReqs);
+$('rTabs').addEventListener('click', e => { const b = e.target.closest('[data-rv]'); if (!b) return; S.reqView = b.dataset.rv; renderReqs(); });
 $('rList').addEventListener('click', e => { const b = e.target.closest('[data-req]'); if (b) openReq(b.dataset.req); });
 if ($('notifBtn')) $('notifBtn').onclick = async () => { try { await Notification.requestPermission(); } catch (e) { } renderReqs(); };
 

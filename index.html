@@ -6,7 +6,7 @@
 <title>أداء فريق العز</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/ui.css?v=20261116c">
+<link rel="stylesheet" href="assets/ui.css?v=20261116d">
 </head>
 <body>
 
@@ -65,6 +65,8 @@
   </div>
 </div></header>
 
+<div id="actBar" class="note" hidden style="margin:10px 16px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>وضع الفحص:</b> تشوف النظام وتتصرف بعين <b id="actName"></b>. <button class="btn sm" id="actExit" type="button">ارجع لحسابي (عبدالمحسن)</button></div>
+
 <main>
   <section id="v-mine" class="view" hidden>
     <div class="panel"><div class="row between"><div><h2 id="mineTitle">مهامي</h2><div class="muted small" id="mineSub"></div></div>
@@ -106,7 +108,7 @@
   <section id="v-req" class="view" hidden>
     <div class="panel"><div class="row between"><div><h2>الطلبات</h2><div class="muted small">أي شغل تبيه من زميل (تصميم، شحن، إطلاق إعلان...) يُطلب من هنا بدل الواتساب. كل طلب له سجل مرتب بكل الردود والتعديلات والتسليمات، وأي تحديث يوصل إشعار للطرف الثاني.</div></div>
       <div class="row"><div class="field"><label for="rScope">اعرض</label><select id="rScope"><option value="me">كل اللي يخصني</option><option value="to">المطلوب مني</option><option value="from">طلباتي من غيري</option><option value="all">الكل</option></select></div>
-      <label class="check small"><input type="checkbox" id="rDone"> أظهر المنتهية</label><button class="btn sm" id="notifBtn" type="button" hidden>فعّل إشعارات المتصفح</button></div></div></div>
+      <div class="row" id="rTabs" style="gap:6px"></div><button class="btn sm" id="notifBtn" type="button" hidden>فعّل إشعارات المتصفح</button></div></div></div>
     <div id="rList"></div>
   </section>
 
@@ -162,8 +164,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="assets/config.js?v=20261116c"></script>
-<script src="assets/app.js?v=20261116c"></script>
-<script src="assets/ui.js?v=20261116c"></script>
+<script src="assets/config.js?v=20261116d"></script>
+<script src="assets/app.js?v=20261116d"></script>
+<script src="assets/ui.js?v=20261116d"></script>
 </body>
 </html>
