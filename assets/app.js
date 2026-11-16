@@ -5,7 +5,7 @@ const C = window.APP_CONFIG;
 const sb = supabase.createClient(C.supabaseUrl, C.supabaseKey);
 
 /* ================= ثوابت ================= */
-const ROLES = { creator: 'صانع محتوى', approver: 'الاعتماد (متعب)', shipper: 'الشحن', media: 'الميديا باير', snap: 'منسق المحتوى (زياد)', social: 'السوشيال ميديا', design: 'التصميم', owned: 'الحسابات المملوكة' };
+const ROLES = { creator: 'صانع محتوى', approver: 'الاعتماد (متعب)', shipper: 'الشحن', media: 'الميديا باير', snap: 'منسق المحتوى (زياد)', social: 'السوشيال ميديا', design: 'التصميم', owned: 'الحسابات المملوكة', bank_view: 'عرض البيانات البنكية' };
 /* دورة المؤثر: التسع مراحل الأصلية (pipeline.md — قرار عبدالمحسن 16 نوفمبر) */
 const STEPS = [
   { k: 'nom', n: 'الترشيح', who: 'creator' },
@@ -253,7 +253,7 @@ async function startInner() {
   if (S.justConfirmed || /access_token/.test(location.hash)) { S.justConfirmed = false; history.replaceState(null, '', APP_URL); }
   if (!me || !me.active) { $('authView').hidden = true; $('appView').hidden = true; $('waitView').hidden = false; $('waitTitle').textContent = 'حسابك بانتظار التفعيل'; $('waitText').textContent = 'تم تأكيد إيميلك وتسجيلك بنجاح. عبدالمحسن يفعّل حسابك ويحدد دورك، وبعدها تقدر تشتغل. ارجع بعد شوي واضغط «تحقّق مرة ثانية».'; return; }
   $('authView').hidden = true; $('waitView').hidden = true; $('appView').hidden = false;
-  try { const k = localStorage.getItem('alezz_bank_priv'); if (k && isAdmin()) S.bankPriv = JSON.parse(k); } catch (e) { }
+  try { const k = localStorage.getItem('alezz_bank_priv'); if (k && (isAdmin() || hasRole(S.me.id, 'bank_view'))) S.bankPriv = JSON.parse(k); } catch (e) { }
   await loadAll();
   $('whoName').textContent = S.me.name || S.me.email;
   applyRoleUI();
@@ -816,7 +816,7 @@ function renderMine() {
   $('mineBody').innerHTML = bar + start + (QO.filter(k => G[k] && G[k].some(keep)).sort((a, b) => secOf(a) - secOf(b)).map(k => {
     const L = G[k].filter(keep), b = BULK[k]; const lateN = L.filter(x => x.d && lateness(x.d, x.i) === 'late').length;
     const head = secOf(k) !== lastSec ? `<h3 class="msec">${SEC[lastSec = secOf(k)][0]}</h3>` : '';
-    const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع للمحدد Excel</button>' : ''}${k === 'ops' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
+    const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع للمحدد Excel</button>' + ((isAdmin() || hasRole(S.me.id, 'bank_view')) && !S.bankPriv ? '<label class="btn sm">تحميل مفتاح البنك<input type="file" data-bankf accept=".json" hidden></label>' : '') : ''}${k === 'ops' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
     else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي ${foreign ? 'له' : 'لك'} ${left} ترشيح</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button>`}</div></div>`).join('');
@@ -885,17 +885,29 @@ function shipSheet(ids) {
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(10, Math.min(40, k.length + 6)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'كشف الشحن'); XLSX.writeFile(wb, `كشف الشحن ${today()}.xlsx`);
 }
-/* كشف الدفع: كل اللي نزل محتواه وما اندفع — للمالية */
-function paySheet(ids) {
+/* كشف الدفع: كل اللي نزل محتواه وما اندفع — للمالية.
+   الآيبان: يطلع مفكوكاً فقط لصاحب صلاحية «عرض البيانات البنكية» ومعه المفتاح الخاص على جهازه —
+   الفك يصير في المتصفح لحظة التصدير، والقاعدة ما تشوف الآيبان أبداً. لغيره يطلع «مشفر». */
+async function paySheet(ids) {
   const dt = t => t ? dtX(t) : '';
   if (!ids || !ids.length) return toast('حدّد بالمربعات الملفات اللي تبي تنزّلها في الكشف', true);
   /* الكشف للمالية: المحدد فقط، وبشرط إن عبدالمحسن اعتمد دفعه وما اندفع */
   const L = S.deals.filter(d => ids.includes(d.id) && d.pay_ok_at && d.approval === 'approved' && allDelivered(d) && !d.paid_at && !d.no_pay && !isClosed(d)).sort((a, b) => new Date(a.posted_at || a.updated_at) - new Date(b.posted_at || b.updated_at));
   if (!L.length) return toast('المحدد ما فيه شي معتمد للدفع', true);
   const noAmt = L.filter(d => needs(d).includes('المبلغ')); if (noAmt.length) return toast(`ما ينزل الكشف: المبلغ ناقص في ${noAmt.map(d => d.name).join('، ')}`, true);
-  const rows = L.map((d, n) => ({ 'م': n + 1, 'الحالة': d.pay_ok_at ? 'معتمد للدفع' : 'ينتظر موافقة عبدالمحسن', 'المؤثر': d.name, 'اليوزر': d.handle, 'جوال المؤثر': d.phone || d.rcv_phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency || 'SAR', 'نزل المحتوى': dt(d.posted_at || d.tt_at || d.sn_at || d.ig_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'ملاحظات': d.notes || '' }));
+  const canBank = isAdmin() || hasRole(S.me.id, 'bank_view');
+  const bank = {};
+  if (canBank) {
+    const { data } = await sb.from('deal_bank').select('deal_id,cipher').in('deal_id', L.map(d => d.id));
+    for (const r of (data || [])) {
+      if (!S.bankPriv) { bank[r.deal_id] = { iban: 'مشفر — حمّل مفتاح البنك من زر «تحميل مفتاح البنك»' }; continue; }
+      try { bank[r.deal_id] = await bankDecrypt(r.cipher); } catch (e) { bank[r.deal_id] = { iban: 'مشفر — ملف المفتاح مو مطابق' }; }
+    }
+  }
+  const rows = L.map((d, n) => { const b = bank[d.id] || {};
+    return { 'م': n + 1, 'الحالة': d.pay_ok_at ? 'معتمد للدفع' : 'ينتظر موافقة عبدالمحسن', 'المؤثر': d.name, 'اليوزر': d.handle, 'جوال المؤثر': d.phone || d.rcv_phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency || 'SAR', 'صاحب الحساب': b.holder || '', 'البنك': b.bank || '', 'الآيبان': b.iban || (canBank ? 'ما سجّل حسابه البنكي' : 'مشفر'), 'نزل المحتوى': dt(d.posted_at || d.tt_at || d.sn_at || d.ig_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'ملاحظات': d.notes || '' }; });
   const tot = L.reduce((s, d) => s + (Number(d.price) || 0), 0);
-  rows.push({ 'م': '', 'الحالة': 'الإجمالي', 'المؤثر': '', 'اليوزر': '', 'جوال المؤثر': '', 'الحملة': '', 'صانع المحتوى': '', 'المنصات': '', 'المبلغ': tot, 'العملة': 'SAR', 'نزل المحتوى': '', 'اعتماد الدفع': '', 'ملاحظات': '' });
+  rows.push({ 'م': '', 'الحالة': 'الإجمالي', 'المؤثر': '', 'اليوزر': '', 'جوال المؤثر': '', 'الحملة': '', 'صانع المحتوى': '', 'المنصات': '', 'المبلغ': tot, 'العملة': 'SAR', 'صاحب الحساب': '', 'البنك': '', 'الآيبان': '', 'نزل المحتوى': '', 'اعتماد الدفع': '', 'ملاحظات': '' });
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(10, Math.min(40, k.length + 8)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'كشف الدفع'); XLSX.writeFile(wb, `كشف الدفع ${today()}.xlsx`);
 }
@@ -918,7 +930,7 @@ function ziadSheet(ids) {
   if (!L.length) return toast('ما فيه محتوى نازل للحين', true);
   const rows = L.map(d => { const cn = camp(d.campaign_id).name || '';
     const en = ((infl(d.influencer_id) || {}).name_en || '').trim();   /* الاسم بالإنجليزي من ملف المؤثر */
-    return { 'اسم المنتج أو العرض': CAMP_EN[cn] || cn, 'صانع المحتوى': d.name, 'اسم صانع المحتوى بالإنجليزي': en, 'Content Type': 'Review', 'تصنيف صانع المحتوى': 'Influencer', 'رابط الفيديو على السوشيال': d.post_url || (d.handle ? 'https://www.tiktok.com/@' + d.handle : ''), 'الفيديو': '', 'TikTok | كود الترويج': d.tt_code || '', 'Meta | كود الترويج': d.ig_code || '', 'Snapchat | كود الترويج': d.sn_user ? '@' + d.sn_user + (en ? ' | ' + en : '') : (d.sn_code || ''), 'كود الفيديو': '', 'تاريخ إضافة الفيديو': dd(d.posted_at || d.tt_at || d.sn_at || d.ig_at) }; });
+    return { 'اسم المنتج أو العرض': CAMP_EN[cn] || cn, 'صانع المحتوى': d.name, 'اسم صانع المحتوى بالإنجليزي': en, 'Content Type': 'Review', 'تصنيف صانع المحتوى': 'Influencer', 'رابط الفيديو على السوشيال': d.post_url || (d.handle ? 'https://www.tiktok.com/@' + d.handle : ''), 'الفيديو': '', 'TikTok | كود الترويج': d.tt_code || '', 'Meta | كود الترويج': d.ig_code || '', 'Snapchat | كود الترويج': d.sn_user ? '@' + d.sn_user + (en ? ' | ' + en : '') : (d.sn_code || ''), 'كود الفيديو': d.video_code || '', 'تاريخ إضافة الفيديو': dd(d.posted_at || d.tt_at || d.sn_at || d.ig_at) }; });
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, Math.min(34, k.length + 8)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'شيت التشغيل'); XLSX.writeFile(wb, `شيت التشغيل ${today()}.xlsx`);
 }
@@ -929,6 +941,11 @@ $('mineBody').addEventListener('click', e => {
   if (e.target.closest('[data-salx]')) salasilSheet(sel);
   if (e.target.closest('[data-payx]')) paySheet(sel);
   if (e.target.closest('[data-ziadx]')) ziadSheet(sel);
+});
+/* مفتاح البنك لمتعب (صلاحية عرض البيانات البنكية): نفس آلية الإعدادات، من جنب كشف الدفع */
+$('mineBody').addEventListener('change', e => {
+  const f = e.target.closest('[data-bankf]'); if (!f || !f.files[0]) return;
+  f.files[0].text().then(t => { const k = JSON.parse(t); S.bankPriv = k; try { localStorage.setItem('alezz_bank_priv', JSON.stringify(k)); } catch (x) { } toast('انحمّل المفتاح — نزّل كشف الدفع والآيبان بيطلع مفكوك'); renderMine(); }).catch(() => toast('الملف مو صحيح', true));
 });
 
 /* ================= ملف المشاركة في الحملة ================= */
@@ -1344,7 +1361,7 @@ async function renderDaily(a, b) {
 }
 $('dXlsx').onclick = async () => {
   const dt = t => !t ? '' : String(t).length <= 10 ? String(t) : dtX(t);
-  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'تسجيل زياد تيك توك': dt(d.tt_ops_at), 'تسجيل زياد سناب': dt(d.sn_ops_at), 'تسجيل زياد انستقرام': dt(d.ig_ops_at), 'تسجيل ملف العمليات': dt(d.ops_logged_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'الدفع': dt(d.paid_at) }));
+  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'كود الفيديو': d.video_code, 'تسجيل زياد تيك توك': dt(d.tt_ops_at), 'تسجيل زياد سناب': dt(d.sn_ops_at), 'تسجيل زياد انستقرام': dt(d.ig_ops_at), 'تسجيل ملف العمليات': dt(d.ops_logged_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'الدفع': dt(d.paid_at) }));
   const infls = S.infl.map(i => ({ 'المعلن': i.name, 'بالإنجليزي': i.name_en, 'اليوزر': i.handle, 'رابط تيك توك': i.tiktok_url, 'نوع الحساب': i.acc_type, 'حالة الحساب': i.account_status, 'المرشِّح': memName(i.nominated_by), 'تاريخ الترشيح': i.nominated_on, 'المصدر': i.source === 'acq' ? 'استقطاب' : i.source === 'campaign' ? 'حملة' : 'مستورد', 'حالة الاستقطاب': (ACQ[i.acq_status] || [i.acq_status])[0], 'سبب القرار': i.acq_reason, 'محاولات التواصل': (i.contacts || []).length, 'آخر نتيجة': ((i.contacts || []).slice(-1)[0] || {}).result || '', 'واجه مشكلة': i.had_problem == null ? '' : i.had_problem ? 'نعم' : 'لا', 'المشكلة': i.problem, 'المنصات': i.platforms, 'سناب': i.snap_user, 'انستقرام': i.ig_user, 'الجوال': i.phone, 'الدولة': i.country, 'المدينة': i.city, 'الحي والرمز': i.district, 'قبل التفاوض': i.price_before, 'بعد التفاوض': i.price_after, 'العملة': i.currency, 'تم الاتفاق': dt(i.agreed_at) }));
   const reqs = S.reqs.map(r => ({ 'النوع': REQ_KINDS[r.kind], 'العنوان': r.title, 'من': memName(r.from_member), 'إلى': memName(r.to_member), 'الموعد': r.due, 'الحالة': REQ_STATUS[r.status][0], 'جولات التعديل': r.rounds, 'تاريخ الطلب': dt(r.created_at), 'تاريخ التسليم': dt(r.done_at), 'التسليم': r.result_url }));
   const camps = S.camps.map(c => { const s = campStats(c.id); return { 'الحملة': c.name, 'الحالة': CAMP_ST[c.status || 'active'][0], 'المطلوب': c.target_total, 'موزّع': S.quotas.filter(q => q.campaign_id === c.id).reduce((x, q) => x + q.quota, 0), 'انرسل': s.sent.length, 'معتمد': s.approved.length, 'مرفوض': s.rejected.length, 'استلموا': s.approved.filter(d => d.delivered_at).length, 'نشروا': s.approved.filter(allDelivered).length }; });
@@ -1438,7 +1455,7 @@ $('kCard').addEventListener('click', e => { const r = e.target.closest('[data-kp
 function renderSetup() {
   $('sMembers').innerHTML = `<table><thead><tr><th>الاسم</th><th>الإيميل</th><th>الأدوار</th><th>مفعّل</th><th>مدير</th><th></th></tr></thead><tbody>${S.members.map(m => `<tr data-m="${m.id}"><td><input type="text" data-k="name" value="${esc(m.name)}" style="min-width:140px"></td><td class="small" dir="ltr">${esc(m.email)}</td><td style="white-space:normal;min-width:260px">${Object.entries(ROLES).map(([k, n]) => `<label class="check small" style="display:inline-flex;min-height:28px;margin-inline-end:8px"><input type="checkbox" data-role="${k}" ${(m.roles || []).includes(k) ? 'checked' : ''}> ${n}</label>`).join('')}</td><td><input type="checkbox" data-k="active" ${m.active ? 'checked' : ''} aria-label="مفعّل"></td><td><input type="checkbox" data-k="is_admin" ${m.is_admin ? 'checked' : ''} ${m.id === S.me.id ? 'disabled' : ''} aria-label="مدير"></td><td><button class="btn sm primary" data-msave type="button">حفظ</button></td></tr>`).join('')}</tbody></table>`;
   $('sSla').innerHTML = STEPS.map(s => `<div class="field"><label for="sla_${s.k}">${s.n}</label><input type="number" min="0" id="sla_${s.k}" value="${S.sla[s.k]}"></div>`).join('');
-  $('sTasks').innerHTML = Object.entries(ROLES).filter(([k]) => k !== 'creator').map(([k, n]) => `<div class="field"><label for="tk_${k}">${n}</label><textarea id="tk_${k}">${esc((S.tasks[k] || []).join('\n'))}</textarea></div>`).join('');
+  $('sTasks').innerHTML = Object.entries(ROLES).filter(([k]) => !['creator', 'bank_view'].includes(k)).map(([k, n]) => `<div class="field"><label for="tk_${k}">${n}</label><textarea id="tk_${k}">${esc((S.tasks[k] || []).join('\n'))}</textarea></div>`).join('');
   const K = S.kpi || {};
   $('sKpi').innerHTML = `<div class="field"><label for="kp_med">وسيط تكلفة المقطع المدفوع (ر.س)</label><input type="number" min="0" id="kp_med" value="${Number(K.cost_median) || 1300}"></div>` + creators().map(m => `<div class="field"><label for="kp_${m.id}">سعة ${esc(m.name)}</label><input type="number" min="1" data-cap="${m.id}" id="kp_${m.id}" value="${Number((K.capacity || {})[m.id]) || 80}"></div>`).join('');
   $('sBank').innerHTML = S.bankPub ? `<div class="muted small">التشفير شغال. المفتاح العام محفوظ، والمؤثرين يقدرون يعبّون حساباتهم البنكية.</div>
