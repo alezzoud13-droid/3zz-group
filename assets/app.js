@@ -590,12 +590,16 @@ async function requestQuota(cid) {
 /* ================= صفحة الحملات ================= */
 function renderCamps() {
   const me = S.me.id, ap = isApprover(), adm = isAdmin();
-  /* المتوقفة والمنتهية مخفية عن الكل فور تغيير حالتها؛ أرشيفها لعبدالمحسن ومتعب فقط */
-  const canOld = adm || ap; $('cEndedWrap').hidden = !canOld;
-  const showOld = canOld && $('cEnded').checked;
-  const ORD = { active: 0, paused: 1, ended: 2 };
-  const L = S.camps.filter(c => showOld || (c.status || 'active') === 'active')
-    .sort((a, b) => (ORD[a.status || 'active'] ?? 3) - (ORD[b.status || 'active'] ?? 3) || new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  /* المتوقفة والمنتهية مخفية عن الموظفين؛ عبدالمحسن ومتعب لهم فلتر واضح: الشغالة / المتوقفة / المنتهية */
+  const canOld = adm || ap;
+  S.campView = canOld ? (S.campView || 'active') : 'active';
+  const cnt = { active: 0, paused: 0, ended: 0 };
+  S.camps.forEach(c => { const k = c.status || 'active'; if (cnt[k] != null) cnt[k]++; });
+  const tabs = $('cTabs'); tabs.hidden = !canOld;
+  if (canOld) tabs.innerHTML = [['active', 'الشغالة'], ['paused', 'المتوقفة'], ['ended', 'المنتهية']].map(([k, n]) => `<button class="btn sm ${S.campView === k ? 'primary' : ''}" data-cv="${k}" type="button">${n}${cnt[k] ? ` (${cnt[k]})` : ''}</button>`).join('') + '<span class="muted small">المتوقفة والمنتهية ما تظهر للموظفين</span>';
+  const L = S.camps.filter(c => (c.status || 'active') === S.campView)
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  if (!L.length) { $('cList').innerHTML = `<div class="empty">${S.campView === 'active' ? 'ما فيه حملات شغالة الحين.' + (canOld && (cnt.paused || cnt.ended) ? ' الأرشيف فوق: المتوقفة والمنتهية.' : '') : 'ما فيه حملات في هذي الخانة.'}</div>`; return; }
   $('cList').innerHTML = L.map(c => {
     const st = campStats(c.id); const D = st.all.filter(d => !d.closed_at || d.approval === 'rejected');
     const shipping = st.approved.filter(d => !d.delivered_at && !d.no_ship).length, deliv = st.approved.filter(d => d.delivered_at).length, posted = st.approved.filter(allDelivered).length;
@@ -605,7 +609,7 @@ function renderCamps() {
     const people = ap || adm ? creators() : creators().filter(m => m.id === me);
     return `<div class="panel" data-camp="${c.id}">
      <div class="row between"><div class="row"><h2>${esc(c.name)}</h2><span class="pill ${CAMP_ST[c.status || 'active'][1]}">${CAMP_ST[c.status || 'active'][0]}</span>${c.product ? `<span class="muted small">${esc(c.product)}</span>` : ''}</div>
-      ${c.status === 'active' && hasRole(me, 'creator') ? `<button class="btn primary" data-nom="${c.id}" type="button">رشّح (حصتك ${myQ}، باقي ${Math.max(0, myQ - myS.used)})</button>` : ''}</div>
+      ${c.status === 'active' && hasRole(me, 'creator') ? `<button class="btn primary" data-nom="${c.id}" type="button">رشّح (حصتك ${myQ}، باقي ${Math.max(0, myQ - myS.used)})</button>` : ''}${c.status !== 'active' && adm ? `<button class="btn good" data-resume="${c.id}" type="button">أعدها شغالة</button>` : ''}</div>
      <div class="tiles">
       <div class="tile"><span class="l">المطلوب</span><span class="v">${target || '—'}</span></div>
       <div class="tile"><span class="l">موزّع على الموظفين</span><span class="v">${quotaSum}</span></div>
@@ -632,10 +636,11 @@ function renderCamps() {
     </div>`;
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
 }
-$('cEnded').addEventListener('input', renderCamps);
+$('cTabs').addEventListener('click', e => { const b = e.target.closest('[data-cv]'); if (!b) return; S.campView = b.dataset.cv; renderCamps(); });
 $('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div><div class="field"><label for="nc_b">سقف الصرف بالريال (اختياري)</label><input type="number" min="0" id="nc_b"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, budget: Number(box.querySelector('#nc_b').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
 $('cList').addEventListener('click', async e => {
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
+  const rs = e.target.closest('[data-resume]'); if (rs) { const r = await q(sb.from('campaigns').update({ status: 'active', active: true }).eq('id', rs.dataset.resume).select().single()); if (r) { upsertLocal(S.camps, r); S.campView = 'active'; toast('رجعت شغالة ✓ — صارت تظهر للفريق كله وزر «رشّح» انفتح لهم'); renderCamps(); } return; }
   const box = e.target.closest('[data-camp]'); if (!box) return; const cid = box.dataset.camp;
   if (e.target.closest('[data-csave]')) { const ch = {}; box.querySelectorAll('[data-k]').forEach(x => ch[x.dataset.k] = x.type === 'number' ? (x.value === '' ? null : Number(x.value)) : x.value.trim()); ch.active = ch.status !== 'ended'; const r = await q(sb.from('campaigns').update(ch).eq('id', cid).select().single()); if (r) { upsertLocal(S.camps, r); toast('انحفظ'); renderCamps(); } }
   if (e.target.closest('[data-qeven]')) { const t = camp(cid).target_total; const inputs = [...box.querySelectorAll('[data-q]')]; if (!t) return toast('عبدالمحسن ما حدد العدد المطلوب للحملة', true); const base = Math.floor(t / inputs.length), extra = t % inputs.length; inputs.forEach((x, k) => x.value = base + (k < extra ? 1 : 0)); toast('وزّعت بالتساوي، راجعها واضغط حفظ'); }
