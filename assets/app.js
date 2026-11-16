@@ -80,6 +80,7 @@ function friendly(err) {
   const m = String((err && (err.message || err.error_description || err.msg)) || err || '');
   if (/متعب|عبدالمحسن|مجموع الحصص/.test(m)) return m;
   if (/failed to fetch|networkerror|network request|load failed|timeout/i.test(m) || (typeof navigator !== 'undefined' && navigator.onLine === false)) return 'فيه مشكلة في الاتصال بالإنترنت. تأكد من النت وجرّب مرة ثانية.';
+  if (/42703|PGRST204|column .* does not exist|schema cache/i.test(m)) return 'قاعدة البيانات ناقصها آخر تحديث — عبدالمحسن يشغّل سكربت التحديث من Supabase وبعدها حدّث الصفحة.';
   if (/jwt|expired|session|refresh token|not authenticated/i.test(m)) return 'انتهت جلستك. سجّل دخول من جديد.';
   if (/row-level|permission|not allowed|unauthorized|forbidden/i.test(m)) return 'ما عندك صلاحية لهذي الخطوة. إذا تحتاجها تواصل مع عبدالمحسن.';
   if (/rate limit|too many|429/i.test(m)) return 'محاولات كثيرة ورا بعض. انتظر دقيقة وجرّب مرة ثانية.';
