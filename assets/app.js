@@ -531,7 +531,7 @@ function openCampNom(cid, preInfl) {
   fixes.forEach(d => cards.push(nomCard(++n, d))); drafts.forEach(d => cards.push(nomCard(++n, d)));
   for (let k = 0; k < free; k++) cards.push(nomCard(++n, null, k === 0 ? preInfl : null));
   modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${quota} · أرسلت ${sentN} · ${fixes.length ? fixes.length + ' ترجع للتعديل · ' : ''}الباقي ${Math.max(0, quota - sentN)}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
-   ${!quota ? `<div class="dup">ما عندك حصة في هذي الحملة. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية».</div>` : ''}
+   ${!quota ? `<div class="dup">ما عندك حصة في هذي الحملة${isAdmin() ? ' — حدد لنفسك حصة من جدول الحصص في تبويب «الحملات»' : `. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية»`}.</div>` : ''}
    ${!cards.length && quota ? `<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من ${esc(apprFor(S.me.id))}.</div>` : ''}
    <div id="cn_cards" style="display:grid;gap:12px">${cards.join('')}</div>
    <div class="panel" style="position:sticky;bottom:0"><div class="row between"><b id="cn_count"></b>
@@ -740,7 +740,8 @@ function renderMine() {
   const G = queuesFor(id); if (id === S.me.id && isAdmin()) { const A = queuesFor('admin'); for (const k in A) G[k] = (G[k] || []).concat(A[k]); }
   const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
   $('mineTitle').textContent = id === S.me.id ? 'مهامي' : 'مهام ' + memName(id);
-  $('mineSub').textContent = total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : 'ما عندك شي معلّق.';
+  const foreign = id !== S.me.id;
+  $('mineSub').textContent = (total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : foreign ? 'ما عنده شي معلّق.' : 'ما عندك شي معلّق.') + (foreign ? ' أنت تطّلع على مهامه فقط — الترشيح من حصته يسويه هو من حسابه.' : '');
   /* عرض فقط: نفس القوائم ونفس العدّ، مرتبة في أقسام، مع تصفية بالمتأخر وآخر يوم */
   const isLate = x => (x.d && lateness(x.d, x.i) === 'late') || (x.r && x.r.due && x.r.due < today()), isSoon = x => !!(x.d && lateness(x.d, x.i) === 'soon');
   const counted = QO.filter(k => G[k] && !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).flatMap(k => G[k].map(x => ({ ...x, k })));
@@ -759,7 +760,7 @@ function renderMine() {
     const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع للمحدد Excel</button>' : ''}${k === 'snap_follow' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
-    else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي لك ${left} ترشيح</div></div><div class="acts"><button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button></div></div>`).join('');
+    else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي ${foreign ? 'له' : 'لك'} ${left} ترشيح</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button>`}</div></div>`).join('');
     else if (k === 'budget_alert') rows = L.map(({ c, pct: bp }) => `<div class="qrow ${bp >= 100 ? 'late' : ''}"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">المعتمد ${fmt(campSpend(c.id))} من سقف ${fmt(Number(c.budget))} ريال${bp >= 100 ? ' — الاعتمادات الجديدة مرفوضة إلا منك أو بعد رفع السقف' : ''}</div></div><div class="acts"><span class="pill ${bp >= 100 ? 'bad' : 'warn'}">${bp}٪</span><a class="btn sm" href="#camps">افتح الحملة</a></div></div>`).join('');
     else if (L[0].i && L[0].i.acq_status !== undefined && !L[0].d) rows = L.map(x => inflRow(x.i)).join('');
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
