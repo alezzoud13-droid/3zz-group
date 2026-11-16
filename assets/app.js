@@ -121,6 +121,15 @@ const adminName = () => (S.members.find(m => m.is_admin && m.active) || {}).name
 const apprNames = () => withRole('approver').filter(m => !m.is_admin).map(m => m.name).join('، ') || 'متعب';
 const apprFor = mid => strictRole(mid, 'approver') ? adminName() : apprNames();
 const stepWho = s => s.who === 'creator' ? 'صانع المحتوى' : s.who === 'approver' ? apprNames() : withRole(s.who).filter(m => !m.is_admin).map(m => m.name).join('، ') || ROLES[s.who];
+/* كل واجهة تطابق الدور: الترشيح والاستقطاب والحملات لصناع المحتوى (والمعتمد والأدمن)، والإدارة للأدمن */
+function applyRoleUI() {
+  if (!S.me) return;
+  document.querySelectorAll('.adm').forEach(e => e.hidden = !isAdmin());
+  const nom = hasRole(S.me.id, 'creator');
+  ['newDeal', 'acqNew'].forEach(x => { const el = $(x); if (el) el.hidden = !nom; });
+  const acq = nom || isApprover();
+  document.querySelectorAll('a[data-v="acq"], a[data-v="camps"]').forEach(a => a.hidden = !acq);
+}
 
 /* ================= المنصات ================= */
 function platKeys(x) { const p = (x && (x.platform ?? x.platforms)) || ''; if (/جميع/.test(p)) return ['tt', 'sn', 'ig']; const a = []; if (/تيك/.test(p)) a.push('tt'); if (/سناب/.test(p)) a.push('sn'); if (/انست/.test(p)) a.push('ig'); return a; }
@@ -240,7 +249,7 @@ async function startInner() {
   try { const k = localStorage.getItem('alezz_bank_priv'); if (k && isAdmin()) S.bankPriv = JSON.parse(k); } catch (e) { }
   await loadAll();
   $('whoName').textContent = S.me.name || S.me.email;
-  document.querySelectorAll('.adm').forEach(e => e.hidden = !isAdmin()); ['newDeal', 'acqNew'].forEach(x => { const el = $(x); if (el) el.hidden = !hasRole(S.me.id, 'creator'); });   // الترشيح لصناع المحتوى فقط
+  applyRoleUI();
   route();
 }
 
@@ -254,6 +263,7 @@ function route() {
 window.addEventListener('hashchange', route);
 function render() {
   updateMineCount();
+  if (S.me && ['acq', 'camps'].includes(S.view) && !(hasRole(S.me.id, 'creator') || isApprover())) { S.view = 'mine'; if (location.hash !== '#mine') { location.hash = '#mine'; return; } }
   ({ mine: renderMine, acq: renderAcq, camps: renderCamps, pipe: renderPipe, req: renderReqs, today: renderToday, dash: renderDash, setup: renderSetup })[S.view]();
 }
 setInterval(async () => { if (!S.me || !$('ov').hidden) return; await loadAll(); render(); }, 90000);
@@ -656,7 +666,7 @@ function actAs(id) {
   else { if (S.realMe) S.me = S.realMe; S.realMe = null; }
   $('actBar').hidden = !S.realMe; if (S.realMe) $('actName').textContent = S.me.name || '';
   $('whoName').textContent = S.me.name || S.me.email;
-  document.querySelectorAll('.adm').forEach(el => el.hidden = !isAdmin()); ['newDeal', 'acqNew'].forEach(x => { const el = $(x); if (el) el.hidden = !hasRole(S.me.id, 'creator'); });
+  applyRoleUI();
   S.campView = 'active'; S.reqView = 'open'; const as = $('mineAs'); if (as) as.value = S.me.id;
   toast(S.realMe ? `دخلت بعين ${S.me.name} — أي زر تضغطه ينفذ فعلياً` : 'رجعت لحسابك');
   if (location.hash !== '#mine') location.hash = '#mine'; else render();
@@ -838,9 +848,10 @@ $('mineBody').addEventListener('click', async e => {
 });
 
 /* كشف الشحن: كل اللي في مرحلة الشحن (جاهز، في الطريق، تعذّر) ببيانات المستلم والحملة والمنتج */
-function shipSheet() {
+function shipSheet(ids) {
   const dt = t => t ? dtX(t) : '';
-  const L = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval === 'approved' && curStep(d) === SI.ship).sort((a, b) => new Date(a.approved_at || a.created_at) - new Date(b.approved_at || b.created_at));
+  let L = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval === 'approved' && curStep(d) === SI.ship).sort((a, b) => new Date(a.approved_at || a.created_at) - new Date(b.approved_at || b.created_at));
+  if (ids && ids.length) L = L.filter(d => ids.includes(d.id));   // محدد؟ الكشف للمحدد فقط
   if (!L.length) return toast('ما فيه شحنات مفتوحة الحين', true);
   const rows = L.map((d, n) => ({ 'م': n + 1, 'الحالة': d.ship_failed_at ? 'تعذّر التسليم' : d.shipped_at ? 'انشحن (في الطريق)' : 'جاهز للشحن', 'المؤثر': d.name, 'اسم المستلم': d.rcv_name || d.name, 'جوال المستلم': d.rcv_phone || d.phone, 'الدولة': d.country, 'المدينة': d.rcv_city, 'الحي والرمز المختصر': [d.address, d.short_code].filter(Boolean).join(' – '), 'الحملة': camp(d.campaign_id).name || '', 'المنتج': camp(d.campaign_id).product || '', 'صانع المحتوى': memName(d.member_id), 'تاريخ الاعتماد': dt(d.approved_at), 'تاريخ الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'ملاحظة الشحن': d.ship_note }));
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(10, Math.min(40, k.length + 6)) }));
@@ -861,8 +872,9 @@ function paySheet(ids) {
   XLSX.utils.book_append_sheet(wb, ws, 'كشف الدفع'); XLSX.writeFile(wb, `كشف الدفع ${today()}.xlsx`);
 }
 /* كشف سلاسل: الجاهز للشحن بصيغة ملف الرفع الجماعي حق شركة الشحن (نفس أعمدة SINV) */
-function salasilSheet() {
-  const L = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval === 'approved' && curStep(d) === SI.ship && !d.shipped_at).sort((a, b) => new Date(a.approved_at || a.created_at) - new Date(b.approved_at || b.created_at));
+function salasilSheet(ids) {
+  let L = S.deals.filter(d => inPipe(d) && !isClosed(d) && !isParked(d) && d.approval === 'approved' && curStep(d) === SI.ship && !d.shipped_at).sort((a, b) => new Date(a.approved_at || a.created_at) - new Date(b.approved_at || b.created_at));
+  if (ids && ids.length) L = L.filter(d => ids.includes(d.id));   // محدد؟ الكشف للمحدد فقط
   if (!L.length) return toast('ما فيه شحنات جاهزة للرفع الحين', true);
   const base = 'INF' + today().replace(/-/g, '');
   const rows = L.map((d, n) => ({ orderNum: `${base}-${n + 1}`, Shipping_Method: '', phone: ph9(d.rcv_phone || d.phone) || '', name: d.rcv_name || d.name, address: [d.address, d.short_code].filter(Boolean).join('-'), city: d.rcv_city || '', state: d.rcv_city || '', zip: '0', country: d.country === 'السعودية' || !d.country ? 'SA' : d.country, cod: '0', sku: camp(d.campaign_id).product || camp(d.campaign_id).name || '', QTY: '1' }));
@@ -871,16 +883,24 @@ function salasilSheet() {
 }
 /* شيت التشغيل لزياد: نفس أعمدة Content Tracker — السيريال (كود الفيديو) وأسماء الإعلانات يولدها الشيت نفسه */
 const CAMP_EN = { 'هيرش سيطرة': 'Hersh Saytara', 'سطوة القرن': 'Satwat AlQarn', 'هيرش فاير': 'Hersh Fire', 'هيرش محور': 'Hersh Mhwar', 'هيرش': 'Hersh' };
-function ziadSheet() {
+function ziadSheet(ids) {
   const dd = t => t ? new Date(t).toLocaleDateString('en-GB', { timeZone: TZ }) : '';
-  const L = S.deals.filter(d => d.approval === 'approved' && !isClosed(d) && platKeys(d).some(p => delivered(d, p))).sort((a, b) => new Date(a.posted_at || a.tt_at || a.sn_at || a.ig_at || 0) - new Date(b.posted_at || b.tt_at || b.sn_at || b.ig_at || 0));
+  let L = S.deals.filter(d => d.approval === 'approved' && !isClosed(d) && platKeys(d).some(p => delivered(d, p))).sort((a, b) => new Date(a.posted_at || a.tt_at || a.sn_at || a.ig_at || 0) - new Date(b.posted_at || b.tt_at || b.sn_at || b.ig_at || 0));
+  if (ids && ids.length) L = L.filter(d => ids.includes(d.id));   // محدد؟ الشيت للمحدد فقط
   if (!L.length) return toast('ما فيه محتوى نازل للحين', true);
   const rows = L.map(d => { const cn = camp(d.campaign_id).name || '';
     return { 'اسم المنتج أو العرض': CAMP_EN[cn] || cn, 'صانع المحتوى': d.name, 'اسم صانع المحتوى بالإنجليزي': '', 'Content Type': 'Review', 'تصنيف صانع المحتوى': 'Influencer', 'رابط الفيديو على السوشيال': d.post_url || (d.handle ? 'https://www.tiktok.com/@' + d.handle : ''), 'الفيديو': '', 'TikTok | كود الترويج': d.tt_code || '', 'Meta | كود الترويج': d.ig_code || '', 'Snapchat | كود الترويج': d.sn_code || d.sn_user || '', 'كود الفيديو': '', 'تاريخ إضافة الفيديو': dd(d.posted_at || d.tt_at || d.sn_at || d.ig_at) }; });
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, Math.min(34, k.length + 8)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'شيت التشغيل'); XLSX.writeFile(wb, `شيت التشغيل ${today()}.xlsx`);
 }
-$('mineBody').addEventListener('click', e => { if (e.target.closest('[data-shipx]')) shipSheet(); if (e.target.closest('[data-salx]')) salasilSheet(); const px = e.target.closest('[data-payx]'); if (px) paySheet([...px.closest('[data-g]').querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk)); if (e.target.closest('[data-ziadx]')) ziadSheet(); });
+$('mineBody').addEventListener('click', e => {
+  const g = e.target.closest('[data-g]'); if (!g) return;
+  const sel = [...g.querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk);   // المحدد في نفس القائمة
+  if (e.target.closest('[data-shipx]')) shipSheet(sel);
+  if (e.target.closest('[data-salx]')) salasilSheet(sel);
+  if (e.target.closest('[data-payx]')) paySheet(sel);
+  if (e.target.closest('[data-ziadx]')) ziadSheet(sel);
+});
 
 /* ================= ملف المشاركة في الحملة ================= */
 function stepPill(d) { const i = curStep(d); if (d.approval === 'rejected') return '<span class="pill bad">مرفوض</span>'; if (i < 0) return `<span class="pill bad">مغلق</span>`; if (d.approval === 'needs_edit') return '<span class="pill warn">يحتاج تعديل</span>'; if (!d.sent_at && d.approval === 'pending') return '<span class="pill">مسودة</span>'; if (isParked(d)) return '<span class="pill acc">احتياط</span>'; if (i >= STEPS.length) return '<span class="pill good">اكتمل</span>'; const l = lateness(d, i); return `<span class="pill ${l === 'late' ? 'bad' : l === 'soon' ? 'warn' : ''}">${STEPS[i].n}${d.ship_failed_at && !d.delivered_at ? ' (تعذّر)' : ''}</span>`; }
