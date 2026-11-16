@@ -240,7 +240,7 @@ async function startInner() {
   try { const k = localStorage.getItem('alezz_bank_priv'); if (k && isAdmin()) S.bankPriv = JSON.parse(k); } catch (e) { }
   await loadAll();
   $('whoName').textContent = S.me.name || S.me.email;
-  document.querySelectorAll('.adm').forEach(e => e.hidden = !isAdmin());
+  document.querySelectorAll('.adm').forEach(e => e.hidden = !isAdmin()); ['newDeal', 'acqNew'].forEach(x => { const el = $(x); if (el) el.hidden = !hasRole(S.me.id, 'creator'); });   // الترشيح لصناع المحتوى فقط
   route();
 }
 
@@ -391,7 +391,7 @@ function openInfl(id) {
 
   <details class="sec ${open2 ? (i.agreed_at ? 'd' : 'c') : ''}" ${open2 && !i.agreed_at ? 'open' : ''}><summary><span class="idx">3</span><span class="ttl">التواصل والتفاوض</span><span class="meta">${i.agreed_at ? 'تم الاتفاق ' + dShort(i.agreed_at) : contacts.length ? contacts.length + ' محاولة' : ''}</span></summary><div class="body">
    ${open2 ? '' : '<div class="lockmsg">هذي المرحلة متاحة بعد اعتماد الترشيح.</div>'}
-   <div class="${open2 ? '' : 'locked'}" style="display:grid;gap:12px" ${open2 && owner ? '' : open2 ? 'inert' : 'inert'}>
+   <div class="${open2 && owner ? '' : 'locked'}" style="display:grid;gap:12px" ${open2 && owner ? '' : 'inert'}>
     <h3>محاولات التواصل</h3><div id="i_contacts" style="display:grid;gap:8px">${contacts.map(contactRow).join('') || '<div class="muted small">ما فيه محاولات مسجّلة.</div>'}</div>
     <div><button class="btn sm" data-a="addc" type="button">+ محاولة تواصل</button></div>
     <div class="field"><label>هل واجهت مشكلة أثناء التواصل أو التفاوض؟</label><div class="row">
@@ -425,7 +425,7 @@ function openInfl(id) {
 
   <details class="sec" ${i.agreed_at || D.length ? 'open' : ''}><summary><span class="idx">4</span><span class="ttl">الحملات</span><span class="meta">${D.length} حملة</span></summary><div class="body">
    ${D.length ? `<div class="tw"><table><thead><tr><th>الحملة</th><th>المرحلة</th><th class="num">المبلغ</th><th>التاريخ</th></tr></thead><tbody>${D.map(d => `<tr class="click" data-opendeal="${d.id}"><td>${esc(camp(d.campaign_id).name || '')}</td><td>${stepPill(d)}</td><td class="num">${d.price != null ? fmt(d.price) : ''}</td><td class="small muted">${dShort(d.created_at)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted small">ما دخل أي حملة للحين.</div>'}
-   ${open2 ? '<div><button class="btn primary" data-a="tocamp" type="button">رشّحه لحملة</button></div>' : ''}
+   ${open2 && (owner || isAdmin()) ? '<div><button class="btn primary" data-a="tocamp" type="button">رشّحه لحملة</button></div>' : ''}
   </div></details>`, root => {
     $('f_x').onclick = closeModal;
     const syncPlat = () => { const k = readPlats(root, 'i'); root.querySelectorAll('[data-for]').forEach(e => e.hidden = !k.includes(e.dataset.for)); };
@@ -656,7 +656,7 @@ function actAs(id) {
   else { if (S.realMe) S.me = S.realMe; S.realMe = null; }
   $('actBar').hidden = !S.realMe; if (S.realMe) $('actName').textContent = S.me.name || '';
   $('whoName').textContent = S.me.name || S.me.email;
-  document.querySelectorAll('.adm').forEach(el => el.hidden = !isAdmin());
+  document.querySelectorAll('.adm').forEach(el => el.hidden = !isAdmin()); ['newDeal', 'acqNew'].forEach(x => { const el = $(x); if (el) el.hidden = !hasRole(S.me.id, 'creator'); });
   S.campView = 'active'; S.reqView = 'open'; const as = $('mineAs'); if (as) as.value = S.me.id;
   toast(S.realMe ? `دخلت بعين ${S.me.name} — أي زر تضغطه ينفذ فعلياً` : 'رجعت لحسابك');
   if (location.hash !== '#mine') location.hash = '#mine'; else render();
