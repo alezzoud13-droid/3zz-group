@@ -360,7 +360,7 @@ function contactRow(c, i) {
 function openInfl(id) {
   const i = infl(id); if (!i) return;
   const me = S.me.id, owner = i.nominated_by === me || isAdmin(), appr = isApprover() && (i.nominated_by !== me || isAdmin());
-  const st = i.acq_status, editable1 = owner && ['draft', 'needs_edit'].includes(st) || isAdmin() || (appr && st === 'approved');
+  const st = i.acq_status, editable1 = owner && ['draft', 'needs_edit'].includes(st) || isAdmin();   // بيانات المؤثر لصاحبها وعبدالمحسن فقط (قرار الملكية الكاملة)
   const priceLock = i.agreed_at && !(isAdmin() || appr) ? 'disabled' : '';
   const open2 = st === 'approved' || st === 'none';
   const keys = platKeys(i); const D = S.deals.filter(d => d.influencer_id === i.id);
