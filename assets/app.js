@@ -174,6 +174,9 @@ const stepAge = (d, i) => ageOf(stepStart(d, i));
 function lateness(d, i) { if (i < 0 || i >= STEPS.length || isParked(d)) return ''; const a = stepAge(d, i), lim = S.sla[STEPS[i].k] ?? DEF_SLA[STEPS[i].k]; return a > lim ? 'late' : a >= lim ? 'soon' : ''; }
 const draftPending = d => !!(d.draft_at && !d.video_ok_at && !allDelivered(d));
 const adName = d => [camp(d.campaign_id).name, d.name, d.hook, memName(d.member_id)].map(x => String(x || '').trim()).filter(Boolean).join(' | ');
+/* سجل النقل: اللي قبل تاريخ النقل يُنسب للمسؤول السابق، واللي بعده للجديد — عدالة القياس */
+const transferNote = T => (Array.isArray(T) && T.length) ? `<div class="note small">🔁 ${T.map(t => `انتقل من ${esc(memName(t.from))} إلى ${esc(memName(t.to))} في ${dShort(t.at)}`).join('، ثم ')} — <b>اللي قبل تاريخ النقل يُنسب للمسؤول السابق، واللي بعده للمسؤول الحالي.</b></div>` : '';
+const transferText = T => (Array.isArray(T) && T.length) ? T.map(t => `${memName(t.from)} ← ${memName(t.to)} (${dShort(t.at)})`).join('، ') : '';
 const adNameFor = (d, p) => adName(d) + ' | ' + PL[p] + (p === 'sn' ? (d.sn_user ? ' | ' + d.sn_user : '') : (d[p + '_code'] ? ' | ' + d[p + '_code'] : ''));
 // رمز رابط المؤثر في جدول خاص (deal_links) يشوفه صاحب الترشيح وعبدالمحسن فقط — تحديث 11
 const intakeLink = d => { const t = S.links[d.id] || d.intake_token; return t ? location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/') + 'intake.html?t=' + t : ''; };
@@ -396,6 +399,7 @@ function openInfl(id) {
    <div class="row"><span class="pill ${(ACQ[st] || ['', ''])[1]}">${i.agreed_at ? 'تم الاتفاق' : (ACQ[st] || [st])[0]}</span><button class="btn" id="f_x" type="button">إغلاق</button></div></div>
   ${acctLinks(null, i) ? `<div class="row">${acctLinks(null, i)}</div>` : ''}
   ${(st === 'needs_edit' || st === 'rejected') && i.acq_reason.trim() ? `<div class="dup"><b>${st === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(i.acq_reason)}</div>` : ''}
+  ${transferNote(i.transfers)}
 
   <details class="sec ${st === 'draft' || st === 'needs_edit' ? 'c' : 'd'}" ${st === 'draft' || st === 'needs_edit' ? 'open' : ''}><summary><span class="idx">1</span><span class="ttl">بيانات الترشيح</span><span class="meta">${i.acq_sent_at ? 'أُرسل ' + dShort(i.acq_sent_at) : ''}</span></summary><div class="body">
    <div class="grid2" ${editable1 ? '' : 'inert'}>
@@ -492,14 +496,15 @@ function openInfl(id) {
         const to = $('i_moveto').value; if (!to) return;
         if (!await confirmBox(`تنقل ملف «${i.name}» وكل ترشيحاته إلى ${memName(to)}؟ التاريخ كله يبقى، بس المسؤول يتغيّر.`)) return;
         b.disabled = true;
-        const r1 = await q(sb.from('influencers').update({ nominated_by: to }).eq('id', i.id).select().single());
+        const at = nowIso();   /* نقطة النقل: اللي قبلها على السابق، واللي بعدها على الجديد */
+        const r1 = await q(sb.from('influencers').update({ nominated_by: to, transfers: [...(Array.isArray(i.transfers) ? i.transfers : []), { from: i.nominated_by, to, at }] }).eq('id', i.id).select().single());
         if (!r1) { b.disabled = false; return; }
         upsertLocal(S.infl, r1);
         for (const d of S.deals.filter(x => x.influencer_id === i.id && !x.closed_at)) {
-          const r2 = await q(sb.from('deals').update({ member_id: to }).eq('id', d.id).select().single());
+          const r2 = await q(sb.from('deals').update({ member_id: to, transfers: [...(Array.isArray(d.transfers) ? d.transfers : []), { from: d.member_id, to, at }] }).eq('id', d.id).select().single());
           if (r2) upsertLocal(S.deals, r2);
         }
-        toast(`انتقل الملف لـ${memName(to)} ✓ — بيظهر في «مهامه» وقوائمه مباشرة`); openInfl(i.id); return;
+        toast(`انتقل الملف لـ${memName(to)} ✓ — وانسجّل النقل بتاريخه: اللي قبله يُنسب للسابق، واللي بعده للجديد`); openInfl(i.id); return;
       }
       if (a === 'wipe') {
         if (!await confirmBox(`حذف نهائي لملف «${i.name}»؟ بينمسح هو و${D.length} ترشيح من القاعدة بلا رجعة. هذا للإدخالات التجريبية فقط.`)) return;
@@ -1012,6 +1017,7 @@ function openDeal(id) {
   modal(`<div class="row between"><div><h2>${esc(d.name)}</h2><div class="muted small">${esc([camp(d.campaign_id).name, memName(d.member_id), platText(keys), d.ad_type, d.handle ? '@' + d.handle : ''].filter(Boolean).join(' · '))}</div></div><div class="row">${I ? `<button class="btn sm" data-openinfl="${I.id}" type="button">ملف المؤثر</button>` : ''}<button class="btn" id="dClose" type="button">إغلاق</button></div></div>
   ${acctLinks(d, I) ? `<div class="row">${acctLinks(d, I)}</div>` : ''}
   ${stepper}
+  ${transferNote(d.transfers)}
   ${d.decision_reason && d.decision_reason.trim() && ['needs_edit', 'rejected'].includes(d.approval) ? `<div class="dup"><b>${d.approval === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(d.decision_reason)}</div>` : ''}
   ${d.closed_at && d.approval !== 'rejected' ? `<div class="dup">مغلق: ${esc(d.closed_reason)}</div>` : ''}
   ${sec(0, `<div class="grid2" ${(d.approval !== 'approved' ? mine : adm) ? '' : 'inert'}>
@@ -1404,8 +1410,8 @@ async function renderDaily(a, b) {
 }
 $('dXlsx').onclick = async () => {
   const dt = t => !t ? '' : String(t).length <= 10 ? String(t) : dtX(t);
-  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'كود الفيديو': d.video_code, 'تقييم المقطع': d.video_score || '', 'ملاحظة التقييم': d.video_score_note || '', 'تسجيل زياد تيك توك': dt(d.tt_ops_at), 'تسجيل زياد سناب': dt(d.sn_ops_at), 'تسجيل زياد انستقرام': dt(d.ig_ops_at), 'تسجيل ملف العمليات': dt(d.ops_logged_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'الدفع': dt(d.paid_at) }));
-  const infls = S.infl.map(i => ({ 'المعلن': i.name, 'بالإنجليزي': i.name_en, 'اليوزر': i.handle, 'رابط تيك توك': i.tiktok_url, 'نوع الحساب': i.acc_type, 'حالة الحساب': i.account_status, 'المرشِّح': memName(i.nominated_by), 'تاريخ الترشيح': i.nominated_on, 'المصدر': i.source === 'acq' ? 'استقطاب' : i.source === 'campaign' ? 'حملة' : 'مستورد', 'حالة الاستقطاب': (ACQ[i.acq_status] || [i.acq_status])[0], 'سبب القرار': i.acq_reason, 'محاولات التواصل': (i.contacts || []).length, 'آخر نتيجة': ((i.contacts || []).slice(-1)[0] || {}).result || '', 'واجه مشكلة': i.had_problem == null ? '' : i.had_problem ? 'نعم' : 'لا', 'المشكلة': i.problem, 'المنصات': i.platforms, 'سناب': i.snap_user, 'انستقرام': i.ig_user, 'الجوال': i.phone, 'الدولة': i.country, 'المدينة': i.city, 'الحي والرمز': i.district, 'قبل التفاوض': i.price_before, 'بعد التفاوض': i.price_after, 'العملة': i.currency, 'تم الاتفاق': dt(i.agreed_at) }));
+  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'سجل النقل': transferText(d.transfers), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'كود الفيديو': d.video_code, 'تقييم المقطع': d.video_score || '', 'ملاحظة التقييم': d.video_score_note || '', 'تسجيل زياد تيك توك': dt(d.tt_ops_at), 'تسجيل زياد سناب': dt(d.sn_ops_at), 'تسجيل زياد انستقرام': dt(d.ig_ops_at), 'تسجيل ملف العمليات': dt(d.ops_logged_at), 'اعتماد الدفع': dt(d.pay_ok_at), 'الدفع': dt(d.paid_at) }));
+  const infls = S.infl.map(i => ({ 'المعلن': i.name, 'بالإنجليزي': i.name_en, 'اليوزر': i.handle, 'رابط تيك توك': i.tiktok_url, 'نوع الحساب': i.acc_type, 'حالة الحساب': i.account_status, 'المرشِّح': memName(i.nominated_by), 'سجل النقل': transferText(i.transfers), 'تاريخ الترشيح': i.nominated_on, 'المصدر': i.source === 'acq' ? 'استقطاب' : i.source === 'campaign' ? 'حملة' : 'مستورد', 'حالة الاستقطاب': (ACQ[i.acq_status] || [i.acq_status])[0], 'سبب القرار': i.acq_reason, 'محاولات التواصل': (i.contacts || []).length, 'آخر نتيجة': ((i.contacts || []).slice(-1)[0] || {}).result || '', 'واجه مشكلة': i.had_problem == null ? '' : i.had_problem ? 'نعم' : 'لا', 'المشكلة': i.problem, 'المنصات': i.platforms, 'سناب': i.snap_user, 'انستقرام': i.ig_user, 'الجوال': i.phone, 'الدولة': i.country, 'المدينة': i.city, 'الحي والرمز': i.district, 'قبل التفاوض': i.price_before, 'بعد التفاوض': i.price_after, 'العملة': i.currency, 'تم الاتفاق': dt(i.agreed_at) }));
   const reqs = S.reqs.map(r => ({ 'النوع': REQ_KINDS[r.kind], 'العنوان': r.title, 'من': memName(r.from_member), 'إلى': memName(r.to_member), 'الموعد': r.due, 'الحالة': REQ_STATUS[r.status][0], 'جولات التعديل': r.rounds, 'تاريخ الطلب': dt(r.created_at), 'تاريخ التسليم': dt(r.done_at), 'التسليم': r.result_url }));
   const camps = S.camps.map(c => { const s = campStats(c.id); return { 'الحملة': c.name, 'الحالة': CAMP_ST[c.status || 'active'][0], 'المطلوب': c.target_total, 'موزّع': S.quotas.filter(q => q.campaign_id === c.id).reduce((x, q) => x + q.quota, 0), 'انرسل': s.sent.length, 'معتمد': s.approved.length, 'مرفوض': s.rejected.length, 'استلموا': s.approved.filter(d => d.delivered_at).length, 'نشروا': s.approved.filter(allDelivered).length }; });
   const wb = XLSX.utils.book_new(); const add = (rows, n) => { const ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; XLSX.utils.book_append_sheet(wb, ws, n); };
