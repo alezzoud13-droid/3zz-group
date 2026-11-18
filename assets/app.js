@@ -61,12 +61,16 @@ const dtX = t => t ? new Date(t).toLocaleString('sv-SE', { timeZone: TZ }).slice
 const fmt = n => n == null || isNaN(n) ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: 1 });
 const pct = (a, b) => b ? Math.round(a / b * 100) : null;
 const median = a => { const v = a.filter(x => x != null && !isNaN(x)).sort((x, y) => x - y); if (!v.length) return null; const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };
-const arDig = s => String(s || '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c));
+const arDig = s => String(s || '').replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c));
 const ph9 = s => { const d = arDig(s).replace(/\D/g, ''); return d.length >= 9 ? d.slice(-9) : ''; };
-/* الجوال: السعودي يتحوّل لـ +966، والدولي لازم يبدأ بـ + أو 00 */
+/* الجوال: السعودي يتحوّل لـ +966، والدولي لازم يبدأ بـ + أو 00.
+   التنظيف يشيل كل شيء غير الأرقام و+: مسافات، شرطات، نقاط، وأهمها علامات الاتجاه الخفية
+   اللي تجي مع النسخ من الواتساب وجهات الاتصال (كانت سبب «رقم الجوال مو صحيح» لأرقام سليمة). */
 function normPhone(s) {
-  let t = arDig(s).replace(/[\s\-()]/g, ''); if (!t) return '';
+  let t = arDig(s).replace(/[^\d+]/g, ''); if (!t) return String(s || '').trim() ? null : '';
+  t = t[0] + t.slice(1).replace(/\+/g, '');            /* + تنحسب في أول الرقم فقط */
   if (/^00\d+$/.test(t)) t = '+' + t.slice(2);
+  t = t.replace(/^\+9660(5\d{8})$/, '+966$1');          /* +966 ثم 05: خطأ شائع ينصلح تلقائياً */
   if (/^05\d{8}$/.test(t)) return '+966' + t.slice(1);
   if (/^5\d{8}$/.test(t)) return '+966' + t;
   if (/^9665\d{8}$/.test(t)) return '+' + t;
