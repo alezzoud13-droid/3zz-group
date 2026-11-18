@@ -451,7 +451,16 @@ function openInfl(id) {
   <details class="sec" ${i.agreed_at || D.length ? 'open' : ''}><summary><span class="idx">4</span><span class="ttl">الحملات</span><span class="meta">${D.length} حملة</span></summary><div class="body">
    ${D.length ? `<div class="tw"><table><thead><tr><th>الحملة</th><th>المرحلة</th><th class="num">المبلغ</th><th>التاريخ</th></tr></thead><tbody>${D.map(d => `<tr class="click" data-opendeal="${d.id}"><td>${esc(camp(d.campaign_id).name || '')}</td><td>${stepPill(d)}</td><td class="num">${d.price != null ? fmt(d.price) : ''}</td><td class="small muted">${dShort(d.created_at)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="muted small">ما دخل أي حملة للحين.</div>'}
    ${open2 && (owner || isAdmin()) ? '<div><button class="btn primary" data-a="tocamp" type="button">رشّحه لحملة</button></div>' : ''}
-  </div></details>`, root => {
+  </div></details>
+  ${isAdmin() ? `<details class="sec"><summary><span class="idx">⚙</span><span class="ttl">إدارة الملف <span class="muted small">· عبدالمحسن فقط</span></span></summary><div class="body">
+   <div class="row" style="align-items:end">
+    <div class="field" style="min-width:220px"><label for="i_moveto">نقل الملف وكل ترشيحاته لموظف آخر</label><select id="i_moveto">${active().filter(m => m.id !== i.nominated_by).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select></div>
+    <button class="btn" data-a="move" type="button">نقل الملف</button>
+   </div>
+   <div class="muted small">النقل يحافظ على كل التاريخ (المحاولات، الأسعار، الحملات) ويغيّر المسؤول فقط — هذا الخيار الصحيح للملف الحقيقي المسجّل باسم الموظف الغلط.</div>
+   <div class="row" style="margin-top:8px"><button class="btn danger sm" data-a="wipe" type="button">حذف الملف نهائياً (إدخال تجريبي)</button></div>
+   <div class="muted small">الحذف يمسح الملف وكل ترشيحاته من القاعدة بلا رجعة — للإدخالات التجريبية فقط، والملف الحقيقي يُنقل ولا يُحذف.</div>
+  </div></details>` : ''}`, root => {
     $('f_x').onclick = closeModal;
     const syncPlat = () => { const k = readPlats(root, 'i'); root.querySelectorAll('[data-for]').forEach(e => e.hidden = !k.includes(e.dataset.for)); };
     root.querySelectorAll('[data-plat="i"]').forEach(c => c.addEventListener('change', syncPlat));
@@ -478,6 +487,31 @@ function openInfl(id) {
       const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a; let ch = null;
       if (a === 'addc') { const box = $('i_contacts'); if (!box.querySelector('[data-ci]')) box.innerHTML = ''; box.insertAdjacentHTML('beforeend', contactRow({}, box.querySelectorAll('[data-ci]').length)); return; }
       if (a === 'tocamp') return openCampNom(null, i.id);
+      /* إدارة الملف (عبدالمحسن فقط): نقل يحفظ التاريخ، وحذف للإدخالات التجريبية */
+      if (a === 'move') {
+        const to = $('i_moveto').value; if (!to) return;
+        if (!await confirmBox(`تنقل ملف «${i.name}» وكل ترشيحاته إلى ${memName(to)}؟ التاريخ كله يبقى، بس المسؤول يتغيّر.`)) return;
+        b.disabled = true;
+        const r1 = await q(sb.from('influencers').update({ nominated_by: to }).eq('id', i.id).select().single());
+        if (!r1) { b.disabled = false; return; }
+        upsertLocal(S.infl, r1);
+        for (const d of S.deals.filter(x => x.influencer_id === i.id && !x.closed_at)) {
+          const r2 = await q(sb.from('deals').update({ member_id: to }).eq('id', d.id).select().single());
+          if (r2) upsertLocal(S.deals, r2);
+        }
+        toast(`انتقل الملف لـ${memName(to)} ✓ — بيظهر في «مهامه» وقوائمه مباشرة`); openInfl(i.id); return;
+      }
+      if (a === 'wipe') {
+        if (!await confirmBox(`حذف نهائي لملف «${i.name}»؟ بينمسح هو و${D.length} ترشيح من القاعدة بلا رجعة. هذا للإدخالات التجريبية فقط.`)) return;
+        if (!await confirmBox('متأكد؟ ما فيه تراجع بعد هذي الضغطة.')) return;
+        b.disabled = true;
+        const { error: e1 } = await sb.from('deals').delete().eq('influencer_id', i.id);
+        if (e1) { toast(friendly(e1), true); b.disabled = false; return; }
+        const { error: e2 } = await sb.from('influencers').delete().eq('id', i.id);
+        if (e2) { toast(friendly(e2), true); b.disabled = false; return; }
+        S.deals = S.deals.filter(x => x.influencer_id !== i.id); S.infl = S.infl.filter(x => x.id !== i.id);
+        toast('انحذف الملف نهائياً'); closeModal(); render(); return;
+      }
       if (a === 'save1') ch = stage1();
       if (a === 'send') { ch = stage1(); if (!ch.name || !ch.acc_type || !ch.tiktok_url) return toast('عبّ الاسم ونوع الحساب ورابط تيك توك', true); if (!ch.name_en) return toast('اكتب الاسم بالإنجليزي — يُستخدم في تسمية المقاطع وشيت التشغيل', true); Object.assign(ch, { acq_status: 'pending', acq_sent_at: nowIso(), acq_reason: '' }); }
       if (a === 'approve') ch = { acq_status: 'approved', acq_decided_at: nowIso(), acq_decided_by: me, acq_reason: '' };
