@@ -279,6 +279,7 @@ const SCENARIOS = [
   /* ---------- approver: raw video ---------- */
   A('approver_raw_video_approve_and_return', 'approver', '#mine', async t => {
     await t.click(`${mine} [data-g="draft"] [data-open="${D.draft_pending1}"]`);
+    await t.select('#f_video_score', '4');
     await t.write(() => t.click('[data-act="vok"]'));
     await t.click('#dClose');
     await t.click(`${mine} [data-g="draft"] [data-open="${D.draft_pending2}"]`);
@@ -503,6 +504,7 @@ const SCENARIOS = [
     await t.click(`${mine} [data-dobulk="appr"]`);
     await t.write(() => t.confirm());
     await t.click(`${mine} [data-g="draft"] [data-open="${D.draft_pending_ap}"]`);
+    await t.select('#f_video_score', '4');
     await t.write(() => t.click('[data-act="vok"]'));
     await t.click('#dClose');
     await t.click(`${mine} [data-g="acq_review"] [data-openinfl="${I.acq_pending_ap}"]`);
