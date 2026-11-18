@@ -111,7 +111,7 @@ const optsBlank = (list, sel, blank) => `<option value="">${blank || 'اختر'}
 
 /* ================= الحالة ================= */
 const APP_URL = location.origin + location.pathname.replace(/index\.html$/, '').replace(/\/?$/, '/');
-const S = { reads: {}, links: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, kpi: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
+const S = { sel: {}, reads: {}, links: {}, notified: {}, lastPoll: null, user: null, me: null, members: [], camps: [], deals: [], reqs: [], infl: [], quotas: [], sla: { ...DEF_SLA }, tasks: {}, kpi: {}, bankPub: null, bankPriv: null, view: 'mine', pStep: '' };
 const mem = id => S.members.find(m => m.id === id);
 const memName = id => (mem(id) || {}).name || '—';
 const active = () => S.members.filter(m => m.active);
@@ -280,7 +280,11 @@ function render() {
   if (S.me && ['acq', 'camps'].includes(S.view) && !(hasRole(S.me.id, 'creator') || isApprover())) { S.view = 'mine'; if (location.hash !== '#mine') { location.hash = '#mine'; return; } }
   ({ mine: renderMine, acq: renderAcq, camps: renderCamps, pipe: renderPipe, req: renderReqs, today: renderToday, dash: renderDash, setup: renderSetup })[S.view]();
 }
-setInterval(async () => { if (!S.me || !$('ov').hidden) return; await loadAll(); render(); }, 90000);
+setInterval(async () => {
+  if (!S.me || !$('ov').hidden) return;
+  if (document.querySelector('#mineBody [data-bulk]:checked')) return;   /* فيه تحديد شغال: ما نقاطعه بتحديث */
+  await loadAll(); render();
+}, 90000);
 
 /* ================= مودال ================= */
 function modal(html, init, small) { const ov = $('ov'); ov.innerHTML = `<div class="modal${small ? ' small' : ''}" role="dialog" aria-modal="true">${html}</div>`; ov.hidden = false; ov.scrollTop = 0; ov.onclick = e => { if (e.target === ov) closeModal(); }; if (init) init(ov.firstElementChild); }
@@ -860,6 +864,7 @@ function renderMine() {
     const L = G[k].filter(keep), b = BULK[k]; const lateN = L.filter(x => x.d && lateness(x.d, x.i) === 'late').length;
     const head = secOf(k) !== lastSec ? `<h3 class="msec">${SEC[lastSec = secOf(k)][0]}</h3>` : '';
     const xb = `${k.startsWith('ship_') ? '<button class="btn sm" data-shipx type="button">تنزيل كشف الشحن Excel</button><button class="btn sm" data-salx type="button">كشف سلاسل Excel</button>' : ''}${k === 'pay_go' ? '<button class="btn sm" data-payx type="button">تنزيل كشف الدفع للمحدد Excel</button>' + ((isAdmin() || hasRole(S.me.id, 'bank_view')) && !S.bankPriv ? '<label class="btn sm">تحميل مفتاح البنك<input type="file" data-bankf accept=".json" hidden></label>' : '') : ''}${k === 'ops' ? '<button class="btn sm" data-ziadx type="button">تنزيل شيت التشغيل Excel</button>' : ''}`;
+    const hasChecks = !!b || k === 'ops';   /* مربعات تحديد: للإجراء الجماعي ولتنزيل شيت التشغيل للمحدد */
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
     else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي ${foreign ? 'له' : 'لك'} ${left} ترشيح</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button>`}</div></div>`).join('');
@@ -868,8 +873,9 @@ function renderMine() {
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }
     else rows = L.map(x => dealRow(x, !!b || k === 'ops', k)).join('');   /* ops: مربعات التحديد لتنزيل شيت التشغيل للمحدد */
-    return head + `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${b || xb ? `<span style="margin-inline-start:auto" class="row">${xb}${b ? `<label class="check small"><input type="checkbox" data-all> الكل</label><button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button>` : ''}</span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
+    return head + `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${hasChecks || xb ? `<span style="margin-inline-start:auto" class="row">${xb ? '<span class="pill" data-selc></span>' : ''}${xb}${hasChecks ? '<label class="check small"><input type="checkbox" data-all> الكل</label>' : ''}${b ? `<button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button>` : ''}</span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
   }).join('') || (f === 'all' ? '<div class="empty">ما عندك شي معلّق الحين. ابدأ من «+ ترشيح» أو اطلب شي من زميل من «+ طلب».</div>' : '<div class="empty">ما فيه مهام بهذي التصفية. اضغط «تنتظر خطوة» عشان ترجع كل مهامك.</div>'));
+  restoreSel();   /* التحديد ما يضيع مع التحديث التلقائي */
 }
 function renderTeam() {
   $('mineTitle').textContent = 'ملخص الفريق'; $('mineSub').textContent = 'كم شي ينتظر كل شخص، وكم منه متأخر.';
@@ -982,9 +988,14 @@ function ziadSheet(ids) {
   const wb = XLSX.utils.book_new(), ws = XLSX.utils.json_to_sheet(rows); ws['!views'] = [{ RTL: true }]; ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(14, Math.min(34, k.length + 8)) }));
   XLSX.utils.book_append_sheet(wb, ws, 'شيت التشغيل'); XLSX.writeFile(wb, `شيت التشغيل ${today()}.xlsx`);
 }
-$('mineBody').addEventListener('click', e => {
+$('mineBody').addEventListener('click', async e => {
   const g = e.target.closest('[data-g]'); if (!g) return;
+  const btn = e.target.closest('[data-shipx],[data-salx],[data-payx],[data-ziadx]'); if (!btn) return;
   const sel = [...g.querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk);   // المحدد في نفس القائمة
+  const tot = g.querySelectorAll('[data-bulk]').length;
+  /* بدون تحديد الكشف ينزل كامل — نسأل أول عشان ما ينزل الكل والموظف يظن إنه نزّل المحدد */
+  if (!sel.length && tot && !e.target.closest('[data-payx]')
+      && !await confirmBox(`ما حددت شي بالمربعات. تنزّل الكشف لكل الـ${tot}؟ إذا تبي بعضهم، أغلق هذي الرسالة وعلّم المربعات أول.`)) return;
   if (e.target.closest('[data-shipx]')) shipSheet(sel);
   if (e.target.closest('[data-salx]')) salasilSheet(sel);
   if (e.target.closest('[data-payx]')) paySheet(sel);
@@ -1247,6 +1258,28 @@ function renderReqs() {
   $('rList').innerHTML = L.length ? `<div style="display:grid;gap:8px">${L.map(reqRow).join('')}</div>` : '<div class="empty">ما فيه طلبات هنا.</div>';
   const nb = $('notifBtn'); if (nb) nb.hidden = !('Notification' in window) || Notification.permission !== 'default';
 }
+/* التحديد يبقى بعد التحديث التلقائي: نحفظه في S.sel ونرجّعه لكل قائمة بعد إعادة الرسم */
+function selLabel(g) {
+  const n = g.querySelectorAll('[data-bulk]:checked').length, t = g.querySelectorAll('[data-bulk]').length;
+  const x = g.querySelector('[data-selc]'); if (!x) return;
+  x.className = 'pill ' + (n ? 'good' : 'warn');
+  x.textContent = n ? `المحدد: ${n} من ${t}` : `ما حددت شي — الكشف ينزل كامل (${t})`;
+}
+function restoreSel() {
+  document.querySelectorAll('#mineBody [data-g]').forEach(g => {
+    const set = S.sel[g.dataset.g];
+    if (set && set.size) g.querySelectorAll('[data-bulk]').forEach(c => { c.checked = set.has(c.dataset.bulk); });
+    const a = g.querySelector('[data-all]'); const all = g.querySelectorAll('[data-bulk]'), on = g.querySelectorAll('[data-bulk]:checked');
+    if (a) a.checked = all.length > 0 && all.length === on.length;
+    selLabel(g);
+  });
+}
+$('mineBody').addEventListener('change', e => {
+  if (!e.target.closest('[data-bulk]') && !e.target.closest('[data-all]')) return;
+  const g = e.target.closest('[data-g]'); if (!g) return;
+  S.sel[g.dataset.g] = new Set([...g.querySelectorAll('[data-bulk]:checked')].map(c => c.dataset.bulk));
+  selLabel(g);
+});
 $('rScope').addEventListener('input', renderReqs);
 $('rTabs').addEventListener('click', e => { const b = e.target.closest('[data-rv]'); if (!b) return; S.reqView = b.dataset.rv; renderReqs(); });
 $('rList').addEventListener('click', e => { const b = e.target.closest('[data-req]'); if (b) openReq(b.dataset.req); });
@@ -1316,7 +1349,7 @@ async function pollReqs() {
   for (const row of data) { upsertLocal(S.reqs, row); changed = true;
     if (unread(row) && S.notified[row.id] !== row.last_event_at) { S.notified[row.id] = row.last_event_at; notifyReq(row);
       const ov = $('ov'); if (!ov.hidden && ov.querySelector('#qClose') && ov.innerHTML.includes(esc(row.title)) && !(($('qRes') || {}).value || ($('qMsg') || {}).value)) openReq(row.id); } }
-  if (changed) { if ($('ov').hidden) render(); else updateMineCount(); }
+  if (changed) { if ($('ov').hidden && !document.querySelector('#mineBody [data-bulk]:checked')) render(); else updateMineCount(); }   /* ما نعيد الرسم وفيه تحديد شغال */
 }
 setInterval(pollReqs, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReqs(); });
