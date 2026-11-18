@@ -561,7 +561,9 @@ const budgetPct = c => { const b = Number(c.budget) || 0; return b ? Math.round(
 function campStats(cid, mid) {
   const D = S.deals.filter(d => d.campaign_id === cid && (!mid || d.member_id === mid));
   const used = D.filter(d => !d.closed_at && d.approval !== 'rejected').length;
-  return { used, all: D, drafts: D.filter(d => !d.sent_at && d.approval === 'pending' && !d.closed_at), sent: D.filter(d => d.sent_at || d.approval !== 'pending'), approved: D.filter(d => d.approval === 'approved'), rejected: D.filter(d => d.approval === 'rejected'), fix: D.filter(d => d.approval === 'needs_edit'), pending: D.filter(d => d.sent_at && d.approval === 'pending') };
+  return { used, all: D, drafts: D.filter(d => !d.sent_at && d.approval === 'pending' && !d.closed_at), sent: D.filter(d => d.sent_at || d.approval !== 'pending'),
+    live: D.filter(d => (d.sent_at || d.approval !== 'pending') && !d.closed_at && d.approval !== 'rejected'),
+    closed: D.filter(d => d.closed_at && d.approval !== 'rejected'), approved: D.filter(d => d.approval === 'approved'), rejected: D.filter(d => d.approval === 'rejected'), fix: D.filter(d => d.approval === 'needs_edit'), pending: D.filter(d => d.sent_at && d.approval === 'pending') };
 }
 function nomCard(n, d, pre) {
   const i = d ? infl(d.influencer_id) : pre ? infl(pre) : null;
@@ -694,7 +696,9 @@ function renderCamps() {
      <div class="tiles">
       <div class="tile"><span class="l">المطلوب</span><span class="v">${target || '—'}</span></div>
       <div class="tile"><span class="l">موزّع على الموظفين</span><span class="v">${quotaSum}</span></div>
-      <div class="tile"><span class="l">انرسل للاعتماد</span><span class="v">${st.sent.length}</span></div>
+      <div class="tile"><span class="l">انرسل للاعتماد</span><span class="v">${st.live.length}</span></div>
+      ${st.rejected.length ? `<div class="tile"><span class="l">مرفوض (ما ياخذ من الحصة)</span><span class="v">${st.rejected.length}</span></div>` : ''}
+      ${st.closed.length ? `<div class="tile"><span class="l">مغلق (ما ياخذ من الحصة)</span><span class="v">${st.closed.length}</span></div>` : ''}
       <div class="tile"><span class="l">معتمد</span><span class="v">${st.approved.length}</span></div>
       <div class="tile"><span class="l">قيد الشحن</span><span class="v">${shipping}</span></div>
       <div class="tile"><span class="l">استلموا</span><span class="v">${deliv}</span></div>
@@ -712,7 +716,8 @@ function renderCamps() {
        <div class="field"><label>سقف الصرف (ريال)</label><input type="number" min="0" data-k="budget" value="${c.budget ?? ''}"></div>
        <div class="field"><label>الحالة</label><select data-k="status">${Object.entries(CAMP_ST).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
       </div><button class="btn sm primary" data-csave type="button">حفظ</button></details>` : ''}
-     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر الاعتماد</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.sent.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
+     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل (شغّال)</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر الاعتماد</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.live.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
+     <div class="muted small">«أرسل (شغّال)» يعد الترشيحات القائمة فقط. المرفوض والمغلق يبقون في السجل لكن ما ياخذون من الحصة، فالموظف يقدر يرشّح بدالهم — عشان كذا تلقى مجموع ما أُرسل تاريخياً أكبر من المطلوب.</div>
      ${ap ? `<div class="row"><button class="btn sm primary" data-qsave type="button">حفظ الحصص</button><button class="btn sm" data-qeven type="button">وزّع المطلوب بالتساوي</button><span class="muted small">مجموع الحصص ${quotaSum}${target ? ' من ' + target : ''}</span></div>` : ''}
     </div>`;
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
