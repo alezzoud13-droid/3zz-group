@@ -1224,7 +1224,7 @@ async function openReq(id) {
   const lastFix = [...E].reverse().find(e => e.type === 'fix' || e.type === 'reopen');
   modal(`<div class="row between"><div><h2>${esc(r.title)}</h2><div class="muted small">${esc(REQ_KINDS[r.kind])} · من ${esc(memName(r.from_member))}${r.to_member ? ' إلى ' + esc(memName(r.to_member)) : ''} · ${r.due ? 'الموعد ' + dShort(r.due) : 'بدون موعد'}${r.rounds ? ' · ' + r.rounds + ' جولة تعديل' : ''}</div><div class="muted small">انطلب: ${dtFull(r.created_at)}${r.done_at ? ' · انتهى: ' + dtFull(r.done_at) : ''}</div></div><span class="pill ${REQ_STATUS[r.status][1]}">${REQ_STATUS[r.status][0]}</span></div>
    ${prog}
-   ${quota ? `<div class="small">الحصة الحالية: ${quotaOf(r.campaign_id, r.from_member)} · المطلوب زيادة: ${r.qty}</div>` : `<div class="card"><div class="hd"><b>الطلب</b>${isFrom && open ? '<button class="btn sm" data-q="edit" type="button" style="margin-inline-start:auto">تعديل الطلب</button>' : ''}</div>
+   ${quota ? `<div class="small">الحصة الحالية: ${quotaOf(r.campaign_id, r.from_member)} · المطلوب زيادة: ${r.qty}</div>` : `<div class="card"><div class="hd"><b>الطلب</b></div>
      <div style="white-space:pre-wrap">${linkify(r.details) || '<span class="muted">بدون تفاصيل</span>'}</div>
      <div class="small muted">${r.size ? 'المقاس: ' + esc(r.size) : ''}${r.size && r.ref_url ? ' · ' : ''}${r.ref_url ? 'المرجع: ' + linkify(r.ref_url) : ''}</div></div>`}
    <h3 style="margin:4px 0 0">السجل <span class="muted small" style="font-weight:400">· الأوقات بتوقيت الرياض</span></h3><div class="tl">${evHtml || (S.noEv ? '<div class="note">السجل يشتغل بعد تشغيل تحديث قاعدة البيانات رقم 3.</div>' : '<div class="muted small">ما فيه أحداث.</div>')}</div>
@@ -1241,8 +1241,8 @@ async function openReq(id) {
     <button class="btn" id="qClose" type="button" style="margin-inline-start:auto">إغلاق</button></div>`, root => {
     $('qClose').onclick = () => { closeModal(); render(); };
     const tl = root.querySelector('.tl'); if (tl) tl.scrollTop = tl.scrollHeight;
+    /* قرار 18 نوفمبر: الطلب بعد إرساله ما يتعدل من أحد — الرد في السجل، أو إلغاء وإنشاء طلب جديد */
     root.addEventListener('click', async e => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q;
-      if (k === 'edit') return reqForm(r);
       b.disabled = true; const done = msg => { toast(msg); openReq(r.id); }; const fail = () => { b.disabled = false; };
       if (k === 'msg') { const t = $('qMsg').value.trim(); if (!t) { fail(); return toast('اكتب الرد', true); } return (await addEv(r, 'comment', t)) ? done('انرسل الرد') : fail(); }
       if (k === 'doing') return (await reqAct(r, { status: 'doing', started_at: nowIso() }, 'start', '')) ? done('انسجّل إنك بدأت') : fail();
