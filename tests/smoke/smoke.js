@@ -484,12 +484,14 @@ const SCENARIOS = [
     await t.fill('#f_sn_user', 'smoke_snap_user');
     await t.write(() => t.click('[data-act="dl_sn"]'));                            // last platform: posted_at
   }),
+  /* قرار 38: بعد الاعتماد ما يقفل صاحب الملف بنفسه — يطلب انسحاب (سبب + وش صار في المنتج المشحون) ويعتمده المعتمد */
   A('creator_close_file', 'creator', '#pipe', async t => {
     await t.click(`#pList [data-open="${D.shipped1}"]`);
-    await t.click('[data-act="close"]');
+    await t.click('[data-act="wdreq"]');
     await t.quiet(() => t.cancel());
-    await t.click('[data-act="close"]');
-    await t.write(() => t.confirm());
+    await t.click('[data-act="wdreq"]');
+    await t.reason('المؤثر اعتذر');
+    await t.write(() => t.reason('يبقى عنده'));
   }),
   A('admin_reopen_closed_and_rejected', 'admin', '#pipe', async t => {
     await t.check('#pClosed');

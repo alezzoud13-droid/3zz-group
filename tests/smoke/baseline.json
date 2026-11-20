@@ -317,7 +317,7 @@
     },
     "creator_close_file": {
       "writes": [
-        {"table":"deals","op":"update","match":{"id":"@deal.shipped1"},"payload":{"closed_at":"<ts>","closed_reason":"ما رد / ألغي"}}
+        {"table":"deals","op":"update","match":{"id":"@deal.shipped1"},"payload":{"wd_product":"يبقى عنده","wd_reason":"المؤثر اعتذر","wd_req_at":"<ts>"}}
       ],
       "exports": [
       ]

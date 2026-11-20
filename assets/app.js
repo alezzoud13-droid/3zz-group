@@ -34,8 +34,8 @@ const NEXT = {
 const DEF_SLA = { nom: 3, appr: 2, intake: 3, ship: 7, draft: 4, vok: 2, post: 2, ops: 1, live: 2, pay_ok: 1, paid: 1 };
 /* مسار الدفع الموازي (قرار 37): طريقة الدفع تنحدد لكل اتفاق، وهي اللي تقرر متى يستحق الدفع ووش تقفل لين يندفع.
    الخانة الفاضية = «بعد النشر» (البيانات القديمة ما تتأثر). */
-const PAY_TERMS = { advance: 'مقدم', before_post: 'قبل النشر', after_post: 'بعد النشر' };
-const PAY_DUE = { advance: 'يستحق فور اعتماد الاتفاق، والمقطع الخام يتقفل لين يندفع', before_post: 'يستحق فور اعتماد المقطع، والنشر يتقفل لين يندفع', after_post: 'يستحق بعد ما ينزل على كل المنصات، وما يقفل شي' };
+const PAY_TERMS = { advance: 'مقدم', before_post: 'قبل النشر', after_post: 'بعد النشر', prepaid: 'مدفوع سابقاً / بعقد' };
+const PAY_DUE = { advance: 'يستحق فور اعتماد الاتفاق، والمقطع الخام يتقفل لين يندفع', before_post: 'يستحق فور اعتماد المقطع، والنشر يتقفل لين يندفع', after_post: 'يستحق بعد ما ينزل على كل المنصات، وما يقفل شي', prepaid: 'محسوب ضمن عقد أو دفعة سابقة — ما يستحق دفع جديد ولا يقفل شي' };
 /* خطوات مسار الدفع: مددها في الإعدادات مع باقي المراحل */
 const PAY_STEPS = [{ k: 'pay_ok', n: 'الدفع ١: اعتماد الدفع (عبدالمحسن)' }, { k: 'paid', n: 'الدفع ٢: كشف متعب ← تم الدفع (المالية)' }];
 const ACC_TYPES = ['مقيم عطور عربي', 'مقيم عطور أجنبي', 'صانع محتوى', 'فلوقات وترندات', 'بيعي', 'يوتيوب', 'مهتم بكرة القدم'];
@@ -181,12 +181,21 @@ function lateness(d, i) { if (i === 'pay_ok' || i === 'paid') { const a = stepAg
 const payTerm = d => d.pay_terms || 'after_post';
 const lastAt = d => platKeys(d).map(p => d[p + '_at']).filter(Boolean).sort().pop();
 /* متى استحق الدفع (null = ما استحق بعد) */
-function payDueAt(d) { const t = payTerm(d); if (t === 'advance') return d.approval === 'approved' ? d.approved_at : null; if (t === 'before_post') return d.video_ok_at || null; return allDelivered(d) ? (d.posted_at || lastAt(d) || null) : null; }
+function payDueAt(d) { const t = payTerm(d); if (t === 'prepaid') return null; if (t === 'advance') return d.approval === 'approved' ? d.approved_at : null; if (t === 'before_post') return d.video_ok_at || null; return allDelivered(d) ? (d.posted_at || lastAt(d) || null) : null; }
 const payDue = d => d.approval === 'approved' && !d.no_pay && !d.paid_at && !isClosed(d) && !!payDueAt(d);
 /* البوابة: وش الخطوة المقفولة لين يندفع؟ */
 const payGate = d => (d.no_pay || d.paid_at) ? '' : payTerm(d) === 'advance' ? 'draft' : payTerm(d) === 'before_post' ? 'post' : '';
 const payBlocks = (d, step) => { const g = payGate(d); return !!g && (step === 'post' ? true : g === 'draft'); };
-const termsLabel = d => d.pay_terms ? PAY_TERMS[d.pay_terms] : 'بعد النشر (افتراضي)';
+const termsLabel = d => d.pay_terms ? PAY_TERMS[d.pay_terms] + (d.pay_terms === 'prepaid' && d.pay_note ? ' — ' + d.pay_note : '') : 'بعد النشر (افتراضي)';
+/* الانسحاب من الحملة (قرار 38): قبل الاعتماد صاحب الملف يقفله بنفسه، وبعد الاعتماد بطلب يعتمده المعتمد — وبعد الدفع عبدالمحسن فقط */
+function wdBox(d, mine, appr, adm, me) {
+  if (isClosed(d)) return d.wd_ok_at ? (adm ? '<button class="btn sm" data-act="reopen" type="button">إعادة فتح (يلغي الانسحاب)</button>' : '') : (adm || appr ? '<button class="btn sm" data-act="reopen" type="button">إعادة فتح</button>' : '');
+  if (d.approval !== 'approved') return mine ? '<button class="btn sm danger" data-act="close" type="button">إغلاق الملف (ما رد / ألغي)</button>' : '';
+  const canOk = adm || (appr && d.member_id !== me && !d.paid_at);
+  if (d.wd_req_at) return `<span class="row"><span class="pill warn">طلب انسحاب من ${esc(memName(d.wd_req_by))} ${dShort(d.wd_req_at)}: ${esc(d.wd_reason)}${d.wd_product ? ' · المنتج: ' + esc(d.wd_product) : ''} — ينتظر ${d.paid_at ? 'عبدالمحسن (مدفوع)' : esc(apprFor(d.member_id))}</span>${canOk ? '<button class="btn sm danger" data-act="wdok" type="button">اعتمد الانسحاب</button><button class="btn sm" data-act="wdno" type="button">ارفض</button>' : ''}${mine ? '<button class="btn sm" data-act="wdcancel" type="button">ألغِ الطلب</button>' : ''}</span>`;
+  return `<span class="row">${d.wd_reject ? `<span class="pill">رُفض طلب الانسحاب: ${esc(d.wd_reject)}</span>` : ''}${mine ? `<button class="btn sm danger" data-act="wdreq" type="button">طلب انسحاب من الحملة</button>` : ''}</span>`;
+}
+const askPrepaid = () => reasonBox('مدفوع سابقاً / بعقد', true, 'وش العقد أو الدفعة؟ (مثلاً: عقد 3 إعلانات دُفع 1 نوفمبر)');
 const draftPending = d => !!(d.draft_at && !d.video_ok_at && !allDelivered(d));
 const adName = d => [camp(d.campaign_id).name, d.name, d.hook, memName(d.member_id)].map(x => String(x || '').trim()).filter(Boolean).join(' | ');
 /* سجل النقل: اللي قبل تاريخ النقل يُنسب للمسؤول السابق، واللي بعده للجديد — عدالة القياس */
@@ -313,7 +322,7 @@ function dialog(html, onOk) {
     box.querySelector('[data-n]').onclick = () => { box.remove(); r(null); }; });
 }
 const confirmBox = msg => dialog(`<h3>تأكيد</h3><p style="margin:0">${esc(msg)}</p>`);
-const reasonBox = (title, required) => dialog(`<h3>${esc(title)}</h3><div class="field"><label for="rsn">السبب${required ? ' (إلزامي)' : ''}</label><textarea id="rsn"></textarea></div>`, box => { const v = box.querySelector('#rsn').value.trim(); if (required && !v) { toast('اكتب السبب', true); return false; } return v || ' '; });
+const reasonBox = (title, required, label = 'السبب') => dialog(`<h3>${esc(title)}</h3><div class="field"><label for="rsn">${esc(label)}${required ? ' (إلزامي)' : ''}</label><textarea id="rsn"></textarea></div>`, box => { const v = box.querySelector('#rsn').value.trim(); if (required && !v) { toast('اكتب السبب', true); return false; } return v || ' '; });
 
 /* ================= زر + ترشيح ================= */
 $('newDeal').onclick = () => modal(`<h2>ترشيح جديد</h2><div class="chooser">
@@ -614,6 +623,7 @@ function nomCard(n, d, pre) {
   </div>`;
 }
 function openCampNom(cid, preInfl) {
+  if (S.replFor && S.replFor.cid !== cid) S.replFor = null;
   const live = S.camps.filter(c => c.status === 'active' && c.active !== false);
   if (!cid) {
     if (!live.length) return modal('<h2>ترشيح للحملة</h2><div class="empty">ما فيه حملات شغالة. عبدالمحسن يضيفها من «الحملات».</div><button class="btn" type="button" onclick="document.getElementById(\'ov\').hidden=true">إغلاق</button>', null, true);
@@ -665,6 +675,7 @@ function openCampNom(cid, preInfl) {
         const price = f(el, 'price');
         const dealData = { influencer_id: iid, campaign_id: cid, member_id: el.dataset.deal ? undefined : me, name: inflData.name, handle, phone: phone || '', platform: platText(keys), acc_type: inflData.acc_type, city: inflData.city, price: price === '' ? null : Number(price), price_before: f(el, 'price_before') === '' ? null : Number(f(el, 'price_before')), ad_type: f(el, 'ad_type'), planned_date: f(el, 'planned_date') || null, hook: f(el, 'hook'), sn_user: inflData.snap_user, country: inflData.country, rcv_name: inflData.name, rcv_phone: phone || '', rcv_city: inflData.city, address: inflData.district };
         Object.keys(dealData).forEach(k => dealData[k] === undefined && delete dealData[k]);
+        if (!el.dataset.deal && S.replFor && S.replFor.cid === cid && !S.deals.some(x => x.replaces_id === S.replFor.id)) dealData.replaces_id = S.replFor.id;
         if (send && done) Object.assign(dealData, { sent_at: nowIso(), batch_id: batch, approval: 'pending', decision_reason: '' });
         const r = await saveDeal(el.dataset.deal || null, dealData); if (!r) { bad++; continue; } el.dataset.deal = r.id; saved++; if (send && done) sent++;
       }
@@ -773,9 +784,9 @@ const QL = {
   acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
   acq_contact: 'معتمد: تواصل وفاوض', intake: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', ship_send: 'جاهزة للشحن', ship_wait: 'في الطريق: سجّل الوصول', ship_fail: 'تعذّر التسليم: تابعها',
   video: 'وصله المنتج: أرسل المقطع الخام للمراجعة', video_fix: 'مقاطع رجعت لك للتعديل', draft: 'مقاطع خام تنتظر اعتمادك', post: 'المقطع معتمد: سجّل النزول والكود لكل منصة',
-  launch: 'نزل وسجّله زياد: شغّل الإعلان', ops: 'نزلت المنصة: سجّلها في ملف العمليات (شيت التشغيل) وعلّم «سجّلت» — كل منصة مستقلة', req_in: 'طلبات عليك', req_fix: 'طلبات رجعت لك للتعديل', req_new: 'تحديثات جديدة على طلباتك (ردود، تعديلات، تسليمات)', req_review: 'طلبات سلّموها لك: راجعها', pay: 'مسار الدفع ١: استحق دفعها وتنتظر موافقتك (الأعلى تقفل مرحلة)', terms: 'حدد طريقة الدفع لكل ملف (مقدم / قبل النشر / بعد النشر)', pay_go: 'مسار الدفع ٢: معتمدة للدفع — نزّل الكشف وأرسله للمالية، وبعد التحويل علّم «تم الدفع»', park: 'احتياط'
+  launch: 'نزل وسجّله زياد: شغّل الإعلان', ops: 'نزلت المنصة: سجّلها في ملف العمليات (شيت التشغيل) وعلّم «سجّلت» — كل منصة مستقلة', req_in: 'طلبات عليك', req_fix: 'طلبات رجعت لك للتعديل', req_new: 'تحديثات جديدة على طلباتك (ردود، تعديلات، تسليمات)', req_review: 'طلبات سلّموها لك: راجعها', wd_review: 'طلبات انسحاب من الحملة تنتظر اعتمادك', replace: 'انسحب من الحملة: رشّح بديل في مكانه', wd_paid: 'انسحب بعد ما اعتمدت دفعه (للعلم — ما راح يطلع في كشف المالية)', pay: 'مسار الدفع ١: استحق دفعها وتنتظر موافقتك (الأعلى تقفل مرحلة)', terms: 'حدد طريقة الدفع لكل ملف (مقدم / قبل النشر / بعد النشر)', pay_go: 'مسار الدفع ٢: معتمدة للدفع — نزّل الكشف وأرسله للمالية، وبعد التحويل علّم «تم الدفع»', park: 'احتياط'
 };
-const QO = ['members', 'budget_alert', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'terms', 'draft', 'req_review', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'ops', 'launch', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'pay_go', 'park'];
+const QO = ['members', 'budget_alert', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'wd_review', 'terms', 'draft', 'req_review', 'replace', 'wd_paid', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'ops', 'launch', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'pay_go', 'park'];
 const BULK = {
   appr: ['اعتماد', () => ({ approval: 'approved', approved_at: nowIso(), approved_by: S.me.id, decision_reason: '' })],
   ship_send: ['تم الشحن اليوم', () => ({ shipped_at: nowIso() })],
@@ -796,7 +807,12 @@ function queuesFor(id) {
     if (i.nominated_by === id) { if (i.acq_status === 'needs_edit') add('acq_fix', { i }); if (i.acq_status === 'draft') add('acq_draft', { i }); if (i.acq_status === 'approved' && !i.agreed_at) add('acq_contact', { i }); }
   }
   for (const d of S.deals) {
-    if (d.closed_at) continue;
+    if (d.closed_at) {
+      if (d.wd_ok_at && id !== 'admin' && d.member_id === id && (camp(d.campaign_id).status || 'active') === 'active' && !S.deals.some(x => x.replaces_id === d.id)) add('replace', { d, i: -1 });
+      if (id === 'admin' && d.wd_ok_at && d.pay_ok_at && !d.paid_at && ageOf(d.wd_ok_at) <= 7) add('wd_paid', { d, i: -1 });
+      continue;
+    }
+    if (d.wd_req_at && d.approval === 'approved') { if (id === 'admin' ? (d.paid_at || apOwn(d.member_id)) : (isAp && d.member_id !== id && !d.paid_at)) add('wd_review', { d, i: -1 }); }
     if (id === 'admin') { if (payDue(d)) add(d.pay_ok_at ? 'pay_go' : 'pay', { d, i: d.pay_ok_at ? 'paid' : 'pay_ok' }); if (needTerms(d) && apOwn(d.member_id)) add('terms', { d, i: -1 }); if (apOwn(d.member_id) && d.sent_at && !isParked(d)) { const j = curStep(d); if (j >= 0 && j < STEPS.length && STEPS[j].k === 'appr') add('appr', { d, i: j }); else if (j >= 0 && j < STEPS.length && STEPS[j].k === 'vok') add('draft', { d, i: j }); } continue; }
     if (d.approval === 'rejected') continue;
     if (isAp && payDue(d) && d.pay_ok_at) add('pay_go', { d, i: 'paid' });
@@ -837,13 +853,13 @@ function queuesFor(id) {
   for (const k in G) G[k].sort((a, b) => (a.d && b.d) ? ((k === 'pay' || k === 'pay_go') && (!!payGate(b.d) - !!payGate(a.d))) || stepAge(b.d, b.i) - stepAge(a.d, a.i) : 0);
   return G;
 }
-function countFor(id) { const G = queuesFor(id); return Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert'].includes(k)).reduce((a, [, v]) => a + v.length, 0); }
+function countFor(id) { const G = queuesFor(id); return Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert', 'wd_paid'].includes(k)).reduce((a, [, v]) => a + v.length, 0); }
 function updateMineCount() { if (!S.me) return; const n = countFor(S.me.id) + (isAdmin() ? countFor('admin') : 0); $('mineCnt').hidden = !n; $('mineCnt').textContent = n; const u = S.reqs.filter(unread).length; $('reqCnt').hidden = !u; $('reqCnt').textContent = u; document.title = (u ? `(${u}) ` : '') + 'أداء فريق العز'; }
 function dealRow(x, bulk, k) {
   const { d, i, p } = x; const late = lateness(d, i); const age = p ? ageOf(d[p + '_at']) : stepAge(d, i);
   const miss = k === 'post' ? platKeys(d).filter(q => !delivered(d, q)).map(q => 'باقي ' + PL[q]).join('، ')
     : k === 'ops' ? platKeys(d).filter(q => !delivered(d, q)).map(q => 'باقي ينزل ' + PL[q] + ' — تابع صانع المحتوى').join('، ') : '';
-  const sub = [camp(d.campaign_id).name || 'بدون حملة', d.member_id !== S.me.id ? memName(d.member_id) : '', p ? PL[p] + (p === 'sn' ? (d.sn_user ? ' · ' + d.sn_user : '') : (d[p + '_code'] ? ' · ' + d[p + '_code'] : '')) : platText(platKeys(d)), miss, d.decision_reason && d.decision_reason.trim() && k === 'camp_fix' ? 'المطلوب: ' + d.decision_reason : '', k === 'video_fix' && (d.draft_feedback || '').trim() ? 'المطلوب: ' + d.draft_feedback : '', d.price != null ? fmt(d.price) + ' ' + (d.currency || '') : ''].filter(Boolean).join(' · ');
+  const sub = [camp(d.campaign_id).name || 'بدون حملة', d.member_id !== S.me.id ? memName(d.member_id) : '', p ? PL[p] + (p === 'sn' ? (d.sn_user ? ' · ' + d.sn_user : '') : (d[p + '_code'] ? ' · ' + d[p + '_code'] : '')) : platText(platKeys(d)), miss, d.decision_reason && d.decision_reason.trim() && k === 'camp_fix' ? 'المطلوب: ' + d.decision_reason : '', k === 'video_fix' && (d.draft_feedback || '').trim() ? 'المطلوب: ' + d.draft_feedback : '', (k === 'wd_review' || k === 'wd_paid') ? 'السبب: ' + d.wd_reason + (d.wd_product ? ' · المنتج: ' + d.wd_product : '') + (d.paid_at ? ' · مدفوع' : '') : '', d.price != null ? fmt(d.price) + ' ' + (d.currency || '') : ''].filter(Boolean).join(' · ');
   const apprBtns = k === 'appr' ? `<button class="btn sm" data-dq="needs_edit" data-id="${d.id}" type="button">تعديل</button><button class="btn sm danger" data-dq="reject" data-id="${d.id}" type="button">رفض</button>` : '';
   const au = (k === 'appr' || k === 'draft') ? acctUrls(d, infl(d.influencer_id))[0] : null; const acctBtn = au ? `<a class="btn sm" href="${esc(au[1])}" target="_blank" rel="noopener">الحساب ↗</a>` : '';
   const isLaunch = k === 'launch', openBtn = `<button class="btn sm" data-open="${d.id}" type="button">افتح</button>`;
@@ -860,7 +876,7 @@ function dealRow(x, bulk, k) {
 /* البيانات الإلزامية قبل ما ينتقل الملف من مرحلة لمرحلة: المبلغ (0 = مقابل منتج) ومنصة التنزيل.
    اعتماد الاستقطاب مستثنى لأن ما فيه خانة مبلغ في تلك المرحلة. */
 const needs = d => { const m = []; if (d.price == null || d.price === '' || isNaN(Number(d.price))) m.push('المبلغ'); if (d.price_before == null || d.price_before === '') m.push('السعر قبل التفاوض'); if (!platKeys(d).length) m.push('منصة التنزيل'); return m; };
-const GO_LABEL = { camp_fix: 'عدّل الترشيح', camp_draft: 'كمّل الترشيح', intake: 'كمّل العنوان', video: 'أرسل المقطع الخام', video_fix: 'أعد إرسال المقطع', draft: 'راجع المقطع', post: 'سجّل النزول', ship_fail: 'تابع التسليم' };
+const GO_LABEL = { wd_review: 'راجع الانسحاب', wd_paid: 'افتح', camp_fix: 'عدّل الترشيح', camp_draft: 'كمّل الترشيح', intake: 'كمّل العنوان', video: 'أرسل المقطع الخام', video_fix: 'أعد إرسال المقطع', draft: 'راجع المقطع', post: 'سجّل النزول', ship_fail: 'تابع التسليم' };
 const dayWord = n => n <= 0 ? 'اليوم' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n <= 10 ? n + ' أيام' : n + ' يوم';
 const moreWrap = (html, name) => html ? `<span class="morew"><button class="btn sm icon" data-more type="button" aria-haspopup="true" aria-expanded="false" aria-label="إجراءات أخرى: ${esc(name)}">⋯</button><span class="more">${html}</span></span>` : '';
 function inflRow(i) { return `<div class="qrow"><span></span><div><div class="t">${esc(i.name)}</div><div class="sub">${esc([i.acc_type, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by), i.acq_reason && i.acq_reason.trim() ? 'المطلوب: ' + i.acq_reason : ''].filter(Boolean).join(' · '))}</div></div><div class="acts"><span class="age">${dayWord(ageOf(i.acq_sent_at || i.created_at))}</span><button class="btn sm go" data-openinfl="${i.id}" type="button">افتح</button>${moreWrap(acctUrls(null, i)[0] ? `<a class="btn sm" href="${esc(acctUrls(null, i)[0][1])}" target="_blank" rel="noopener">الحساب ↗</a>` : '', i.name)}</div></div>`; }
@@ -869,20 +885,20 @@ function renderMine() {
   if (isAdmin()) { const v = as.value || S.me.id; as.innerHTML = `<option value="${S.me.id}">أنا</option><option value="team">ملخص الفريق</option>` + active().filter(m => m.id !== S.me.id).map(m => `<option value="${m.id}">${esc(m.name)}</option>`).join(''); as.value = [...as.options].some(o => o.value === v) ? v : S.me.id; id = as.value; }
   if (id === 'team') return renderTeam();
   const G = queuesFor(id); if (id === S.me.id && isAdmin()) { const A = queuesFor('admin'); for (const k in A) G[k] = (G[k] || []).concat(A[k]); }
-  const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
+  const total = Object.entries(G).filter(([k]) => !['park', 'camp_quota', 'acq_contact', 'req_new', 'budget_alert', 'wd_paid'].includes(k)).reduce((a, [, v]) => a + v.length, 0);
   $('mineTitle').innerHTML = id === S.me.id ? 'مهامي' : `مهام ${esc(memName(id))} ${isAdmin() && !S.realMe ? `<button class="btn sm" data-act-as="${id}" type="button">ادخل بعينه (وضع الفحص)</button>` : ''}`;
   const foreign = id !== S.me.id;
   $('mineSub').textContent = (total ? `${total} شي ينتظر خطوة. الأحمر تجاوز المدة.` : foreign ? 'ما عنده شي معلّق.' : 'ما عندك شي معلّق.') + (foreign ? ' أنت تطّلع على مهامه فقط — الترشيح من حصته يسويه هو من حسابه.' : '');
   /* عرض فقط: نفس القوائم ونفس العدّ، مرتبة في أقسام، مع تصفية بالمتأخر وآخر يوم */
   const isLate = x => (x.d && lateness(x.d, x.i) === 'late') || (x.r && x.r.due && x.r.due < today()), isSoon = x => !!(x.d && lateness(x.d, x.i) === 'soon');
-  const counted = QO.filter(k => G[k] && !['park', 'camp_quota', 'acq_contact', 'req_new'].includes(k)).flatMap(k => G[k].map(x => ({ ...x, k })));
+  const counted = QO.filter(k => G[k] && !['park', 'camp_quota', 'acq_contact', 'req_new', 'wd_paid'].includes(k)).flatMap(k => G[k].map(x => ({ ...x, k })));
   const nLate = counted.filter(isLate).length, nSoon = counted.filter(isSoon).length, f = ['late', 'soon'].includes(S.mineF) ? S.mineF : 'all';
   const keep = x => f === 'all' || (f === 'late' ? isLate(x) : isSoon(x));
   const stat = (key, n, label, cls) => `<button class="mstat ${cls}" type="button" data-mf="${key}" aria-pressed="${f === key}"><b>${n}</b>${label}</button>`;
   const bar = total ? `<div class="mbar" role="group" aria-label="ملخص المهام">${stat('all', total, 'تنتظر خطوة', '')}${stat('late', nLate, 'متأخرة', nLate ? 'bad' : '')}${stat('soon', nSoon, 'آخر يوم', nSoon ? 'warn' : '')}</div>` : '';
   const top = f === 'all' ? counted.filter(x => x.d && lateness(x.d, x.i) === 'late').sort((a, b) => stepAge(b.d, b.i) - stepAge(a.d, a.i)).slice(0, 3) : [];
   const start = top.length ? `<h3 class="msec">ابدأ من هنا<small>الأكثر تأخيراً أول. نفس المهام موجودة في قوائمها تحت</small></h3><div class="panel" data-top><div style="display:grid;gap:8px">${top.map(x => dealRow(x, false, x.k)).join('')}</div></div>` : '';
-  const SEC = [['يحتاج قرارك', ['members', 'acq_review', 'appr', 'quota_req', 'terms', 'draft', 'pay', 'req_review']], ['رجع لك للتعديل', ['req_fix', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail']], ['شغلك الحين', null], ['مسودات وحصص واحتياط', ['camp_quota', 'acq_draft', 'camp_draft', 'park']]];
+  const SEC = [['يحتاج قرارك', ['members', 'acq_review', 'appr', 'quota_req', 'wd_review', 'wd_paid', 'terms', 'draft', 'pay', 'req_review']], ['رجع لك للتعديل', ['req_fix', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail']], ['شغلك الحين', null], ['مسودات وحصص واحتياط', ['camp_quota', 'acq_draft', 'camp_draft', 'park']]];
   const secOf = k => { const i = SEC.findIndex(([, ks]) => ks && ks.includes(k)); return i < 0 ? 2 : i; };
   let lastSec = -1;
   $('mineBody').innerHTML = bar + start + (QO.filter(k => G[k] && G[k].some(keep)).sort((a, b) => secOf(a) - secOf(b)).map(k => {
@@ -897,6 +913,7 @@ function renderMine() {
     else if (L[0].i && L[0].i.acq_status !== undefined && !L[0].d) rows = L.map(x => inflRow(x.i)).join('');
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }
+    else if (k === 'replace') rows = L.map(({ d }) => `<div class="qrow"><span></span><div><div class="t">${esc(d.name)}</div><div class="sub">${esc([camp(d.campaign_id).name, 'انسحب: ' + d.wd_reason, 'اعتمده ' + memName(d.wd_ok_by) + ' ' + dShort(d.wd_ok_at)].filter(Boolean).join(' · '))}</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-repl="${d.id}" type="button">رشّح بديل</button>`}<button class="btn sm" data-open="${d.id}" type="button">افتح</button></div></div>`).join('');
     else if (k === 'terms') rows = L.map(({ d }) => `<div class="qrow"><span></span><div><div class="t">${esc(d.name)}</div><div class="sub">${esc([camp(d.campaign_id).name || 'بدون حملة', memName(d.member_id), 'المرحلة: ' + ((STEPS[curStep(d)] || { n: 'اكتمل' }).n), d.price != null ? fmt(d.price) + ' ' + (d.currency || '') : ''].filter(Boolean).join(' · '))}</div></div><div class="acts">${termsSel(d)}<button class="btn sm" data-open="${d.id}" type="button">افتح</button></div></div>`).join('');
     else rows = L.map(x => dealRow(x, !!b || k === 'ops', k)).join('');   /* ops: مربعات التحديد لتنزيل شيت التشغيل للمحدد */
     return head + `<div class="panel" data-g="${k}"><div class="qhead"><h3>${QL[k]}</h3><span class="num">${L.length}</span>${lateN ? `<span class="pill bad">${lateN} متأخر</span>` : ''}${hasChecks || xb ? `<span style="margin-inline-start:auto" class="row">${xb ? '<span class="pill" data-selc></span>' : ''}${xb}${hasChecks ? '<label class="check small"><input type="checkbox" data-all> الكل</label>' : ''}${b ? `<button class="btn sm primary" data-dobulk="${k}" type="button">${b[0]} للمحدد</button>` : ''}</span>` : ''}</div>${k === 'park' ? `<details><summary class="small muted" style="cursor:pointer">اعرض القائمة</summary><div style="display:grid;gap:8px;margin-top:8px">${rows}</div></details>` : `<div style="display:grid;gap:8px">${rows}</div>`}</div>`;
@@ -918,6 +935,7 @@ $('mineBody').addEventListener('click', async e => {
   const o = e.target.closest('[data-open]'); if (o) return openDeal(o.dataset.open);
   const rq = e.target.closest('[data-req]'); if (rq) return openReq(rq.dataset.req);
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
+  const rp = e.target.closest('[data-repl]'); if (rp) { const d = S.deals.find(x => x.id === rp.dataset.repl); if (d) { S.replFor = { cid: d.campaign_id, id: d.id, name: d.name }; return openCampNom(d.campaign_id); } }
   const as = e.target.closest('[data-as]'); if (as) { $('mineAs').value = as.dataset.as; return renderMine(); }
   const mf = e.target.closest('[data-mf]'); if (mf) { S.mineF = S.mineF === mf.dataset.mf ? 'all' : mf.dataset.mf; return renderMine(); }
   const a1 = e.target.closest('[data-ap1]'); if (a1) { if (a1.disabled) return; const d = S.deals.find(x => x.id === a1.dataset.ap1); if (!d) return;
@@ -1030,7 +1048,8 @@ $('mineBody').addEventListener('click', async e => {
 /* طريقة الدفع من «مهامي»: تنحفظ فور الاختيار */
 $('mineBody').addEventListener('change', async e => {
   const t = e.target.closest('[data-terms]'); if (!t || !t.value) return; const d = S.deals.find(x => x.id === t.dataset.terms); if (!d) return;
-  t.disabled = true; const r = await saveDeal(d.id, { pay_terms: t.value }); t.disabled = false;
+  const ch = { pay_terms: t.value }; if (t.value === 'prepaid') { const n = await askPrepaid(); if (n == null) { t.value = ''; return; } ch.pay_note = n.trim(); }
+  t.disabled = true; const r = await saveDeal(d.id, ch); t.disabled = false;
   if (r) { toast(`انحفظت: ${d.name} — ${PAY_TERMS[t.value]}. ${PAY_DUE[t.value]}`); renderMine(); updateMineCount(); }
 });
 /* مفتاح البنك لمتعب (صلاحية عرض البيانات البنكية): نفس آلية الإعدادات، من جنب كشف الدفع */
@@ -1062,7 +1081,7 @@ function openDeal(id) {
   ${stepper}
   ${transferNote(d.transfers)}
   ${d.decision_reason && d.decision_reason.trim() && ['needs_edit', 'rejected'].includes(d.approval) ? `<div class="dup"><b>${d.approval === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(d.decision_reason)}</div>` : ''}
-  ${d.closed_at && d.approval !== 'rejected' ? `<div class="dup">مغلق: ${esc(d.closed_reason)}</div>` : ''}
+  ${d.closed_at && d.approval !== 'rejected' ? `<div class="dup">مغلق: ${esc(d.closed_reason)}${d.wd_ok_at ? ` · اعتمده ${esc(memName(d.wd_ok_by))} ${dShort(d.wd_ok_at)}${d.wd_product ? ' · المنتج: ' + esc(d.wd_product) : ''}` : ''}</div>` : ''}${d.replaces_id ? `<div class="note small">🔁 بديل عن ${esc((S.deals.find(x => x.id === d.replaces_id) || {}).name || 'ملف منسحب')}</div>` : ''}
   ${sec(0, `<div class="grid2" ${(d.approval !== 'approved' ? mine : adm) ? '' : 'inert'}>
      <div class="field"><label for="f_name">الاسم</label><input type="text" id="f_name" value="${v('name')}"></div>
      <div class="field"><label for="f_acc_type">نوع المحتوى</label><select id="f_acc_type">${optsBlank(ACC_TYPES, d.acc_type)}</select></div>
@@ -1110,7 +1129,7 @@ function openDeal(id) {
    <div class="muted small">${esc(PAY_DUE[payTerm(d)])}.${payGate(d) ? ` <b>${payGate(d) === 'draft' ? 'المقطع الخام والنشر مقفولين' : 'النشر مقفول'} لين يتسجل «تم الدفع».</b>` : ''}</div>
    ${(adm || (appr && d.member_id !== me)) && !d.paid_at ? `<div class="row">${termsSel(d, 'f_pay_terms')}<button class="btn sm" data-act="terms" type="button">حفظ طريقة الدفع</button></div>` : ''}</div>` : ''}
   <div class="row between"><div class="row">${d.no_pay ? '' : d.paid_at ? (adm ? `<button class="btn sm" data-act="paid" type="button">دُفع ${dShort(d.paid_at)} (اضغط للتراجع)</button>` : `<span class="pill good">دُفع ${dShort(d.paid_at)}</span>`) : d.pay_ok_at ? `<span class="pill acc">الدفع معتمد من ${esc(memName(d.pay_ok_by))} ${dShort(d.pay_ok_at)}</span>${adm || isApprover() ? '<button class="btn sm good" data-act="paid" type="button">تم الدفع</button>' : ''}` : adm ? '<button class="btn sm" data-act="payok" type="button">اعتماد الدفع</button>' : allDelivered(d) ? '<span class="muted small">الدفع بعد موافقة عبدالمحسن</span>' : ''}</div>
-   ${!isClosed(d) ? (mine ? '<button class="btn sm danger" data-act="close" type="button">إغلاق الملف (ما رد / ألغي)</button>' : '') : (adm || appr ? '<button class="btn sm" data-act="reopen" type="button">إعادة فتح</button>' : '')}</div>`, root => {
+   ${wdBox(d, mine, appr, adm, me)}</div>`, root => {
     $('dClose').onclick = closeModal;
     if (adm) renderBank(d);
     const val = k => { const e = $('f_' + k); return e.type === 'checkbox' ? e.checked : e.type === 'number' ? (e.value === '' ? null : Number(e.value)) : e.value.trim(); };
@@ -1131,13 +1150,14 @@ function openDeal(id) {
       vok: () => { const r = Number(val('video_score')); if (!(r >= 1 && r <= 5)) { toast('اختر تقييم المقطع من 1 إلى 5 قبل الاعتماد', true); return null; } return { video_ok_at: nowIso(), draft_feedback: '', video_score: r, video_score_note: val('video_score_note') }; },
       paid: () => { if (!d.paid_at && needs(d).includes('المبلغ')) { toast('اكتب المبلغ في قسم الترشيح قبل تسجيل الدفع', true); return null; } return { paid_at: d.paid_at ? null : nowIso() }; },
       terms: () => { const t = val('pay_terms'); if (!t) { toast('اختر طريقة الدفع', true); return null; } return { pay_terms: t }; },
+      wdcancel: () => ({ wd_req_at: null }),
       payok: () => { if (needs(d).includes('المبلغ')) { toast('اكتب المبلغ في قسم الترشيح قبل اعتماد الدفع', true); return null; } return { pay_ok_at: nowIso(), pay_ok_by: me }; },
       ops_tt: () => ({ tt_ops_at: nowIso(), ops_logged_by: me }),
       ops_sn: () => ({ sn_ops_at: nowIso(), ops_logged_by: me }),
       ops_ig: () => ({ ig_ops_at: nowIso(), ops_logged_by: me }),
       opsx: () => ({ tt_ops_at: null, sn_ops_at: null, ig_ops_at: null, ops_logged_at: null, ops_logged_by: null }),
       close: () => ({ closed_at: nowIso(), closed_reason: 'ما رد / ألغي' }),
-      reopen: () => ({ closed_at: null, closed_reason: '', approval: d.approval === 'rejected' ? 'pending' : d.approval, sent_at: d.approval === 'rejected' ? null : d.sent_at })
+      reopen: () => ({ ...(d.wd_ok_at ? { wd_ok_at: null, wd_ok_by: null, wd_req_at: null } : {}), closed_at: null, closed_reason: '', approval: d.approval === 'rejected' ? 'pending' : d.approval, sent_at: d.approval === 'rejected' ? null : d.sent_at })
     };
     root.addEventListener('click', async e => {
       const b = e.target.closest('[data-act]'); if (!b) return; const a = b.dataset.act; let ch;
@@ -1148,6 +1168,11 @@ function openDeal(id) {
         const ap = isApprover() && !isAdmin() ? S.members.find(m => m.is_admin && m.active) : withRole('approver').filter(m => !m.is_admin || (m.roles || []).includes('approver'))[0];
         b.disabled = true; const r = await saveReq(null, { kind: 'edit', deal_id: d.id, title: `تعديل بيانات بعد الاعتماد: ${d.name}`, details: why.trim(), to_member: ap ? ap.id : null, from_member: me }); b.disabled = false;
         if (r) toast('انرسل طلب التعديل لـ' + (ap ? ap.name : apprNames()) + '. يطلع له في «مهامي»'); return; }
+      if (a === 'terms' && val('pay_terms') === 'prepaid') { const n = await askPrepaid(); if (n == null) return; b.disabled = true; const r = await saveDeal(d.id, { pay_terms: 'prepaid', pay_note: n.trim() }); b.disabled = false; if (r) { toast('انحفظ: مدفوع سابقاً / بعقد — ما يطلع في قوائم الدفع'); openDeal(d.id); } return; }
+      if (a === 'wdreq') { const why = await reasonBox('طلب انسحاب من الحملة — وش السبب؟', true); if (why == null) return; let prod = ''; if (d.shipped_at || d.delivered_at) { prod = await reasonBox('المنتج انشحن له — وش صار فيه؟', true, 'يرجع / يبقى عنده / ما انعرف للحين'); if (prod == null) return; }
+        b.disabled = true; const r = await saveDeal(d.id, { wd_req_at: nowIso(), wd_reason: why.trim(), wd_product: (prod || '').trim() }); b.disabled = false; if (r) { toast(`انرسل طلب الانسحاب ✓ — ينتظر ${d.paid_at ? 'عبدالمحسن (الملف مدفوع)' : apprFor(d.member_id)}. بعد الاعتماد يرجع مكانه لحصتك وترشّح بديل`); openDeal(d.id); } return; }
+      if (a === 'wdok') { if (!await confirmBox(`تعتمد انسحاب ${d.name} من الحملة؟ الملف ينقفل ويطلع من الدفع، ومكانه يرجع لحصة ${memName(d.member_id)}`)) return; b.disabled = true; const r = await saveDeal(d.id, { wd_ok_at: nowIso(), wd_ok_by: me, closed_at: nowIso(), closed_reason: 'انسحب من الحملة: ' + d.wd_reason }); b.disabled = false; if (r) { toast(`انعتمد الانسحاب ✓ — رجع لـ${memName(d.member_id)} يرشّح بديل في «مهامي»`); openDeal(d.id); } return; }
+      if (a === 'wdno') { const why = await reasonBox('ليش ترفض الانسحاب؟', true); if (why == null) return; b.disabled = true; const r = await saveDeal(d.id, { wd_req_at: null, wd_reject: why.trim() }); b.disabled = false; if (r) { toast('انرفض الانسحاب — رجع لصاحب الملف مع السبب'); openDeal(d.id); } return; }
       if (a.startsWith('dl_')) ch = dl(a.slice(3));
       else if (a.startsWith('code_')) { const p = a.slice(5); ch = p === 'sn' ? { sn_user: val('sn_user'), sn_code: val('sn_code') } : { [p + '_code']: val(p + '_code') }; }
       else ch = A[a]();
@@ -1169,6 +1194,7 @@ function openDeal(id) {
           vok: 'انعتمد المقطع ✓ — رجع لصانع المحتوى في «مهامي» عشان ينزّله ويسجّل الكود لكل منصة',
           payok: 'اعتمدت الدفع ✓ — انتقلت لمتعب في «معتمدة للدفع»: ينزّل الكشف ويرسله للمالية',
           terms: 'انحفظت طريقة الدفع ✓ — النظام يحسب الاستحقاق ويقفل المرحلة المرتبطة لين يندفع',
+          wdcancel: 'انلغى طلب الانسحاب — الملف يكمل عادي',
           ops_tt: 'انسجّل تيك توك في ملف العمليات ✓ — انفتح تشغيله للميديا باير',
           ops_sn: 'انسجّل سناب في ملف العمليات ✓ — انفتح تشغيله للميديا باير',
           ops_ig: 'انسجّل انستقرام في ملف العمليات ✓ — انفتح تشغيله للميديا باير',
@@ -1480,7 +1506,7 @@ async function renderDaily(a, b) {
 }
 $('dXlsx').onclick = async () => {
   const dt = t => !t ? '' : String(t).length <= 10 ? String(t) : dtX(t);
-  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'سجل النقل': transferText(d.transfers), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'كود الفيديو': d.video_code, 'تقييم المقطع': d.video_score || '', 'ملاحظة التقييم': d.video_score_note || '', 'تسجيل زياد تيك توك': dt(d.tt_ops_at), 'تسجيل زياد سناب': dt(d.sn_ops_at), 'تسجيل زياد انستقرام': dt(d.ig_ops_at), 'تسجيل ملف العمليات': dt(d.ops_logged_at), 'طريقة الدفع': termsLabel(d), 'استحق الدفع': dt(payDueAt(d)), 'اعتماد الدفع': dt(d.pay_ok_at), 'الدفع': dt(d.paid_at) }));
+  const deals = S.deals.map(d => ({ 'المؤثر': d.name, 'اليوزر': d.handle, 'الجوال': d.phone, 'الحملة': camp(d.campaign_id).name || '', 'صانع المحتوى': memName(d.member_id), 'سجل النقل': transferText(d.transfers), 'نوع المحتوى': d.acc_type, 'نوع الإعلان': d.ad_type, 'المنصات': platText(platKeys(d)), 'المبلغ': d.price, 'العملة': d.currency, 'المرحلة': d.approval === 'rejected' ? 'مرفوض' : d.approval === 'needs_edit' ? 'يحتاج تعديل' : !inPipe(d) ? 'مسودة' : isClosed(d) ? 'مغلق' : (STEPS[curStep(d)] || { n: 'اكتمل' }).n, 'سبب القرار': d.decision_reason, 'الإرسال للاعتماد': dt(d.sent_at), 'الاعتماد': dt(d.approved_at), 'المدينة': d.rcv_city, 'الحي والرمز': d.address, 'الشحن': dt(d.shipped_at), 'شركة الشحن': d.ship_company, 'رقم البوليصة': d.tracking, 'الوصول': dt(d.delivered_at), 'تعذّر التسليم': dt(d.ship_failed_at), 'نزل تيك توك': dt(d.tt_at), 'كود تيك توك': d.tt_code, 'نزل سناب': dt(d.sn_at), 'يوزر سناب': d.sn_user, 'نزل انستقرام': dt(d.ig_at), 'كود انستقرام': d.ig_code, 'تشغيل تيك توك': dt(d.tt_live_at), 'تشغيل سناب': dt(d.sn_live_at), 'تشغيل انستقرام': dt(d.ig_live_at), 'الهوك': d.hook, 'كود الفيديو': d.video_code, 'تقييم المقطع': d.video_score || '', 'ملاحظة التقييم': d.video_score_note || '', 'تسجيل زياد تيك توك': dt(d.tt_ops_at), 'تسجيل زياد سناب': dt(d.sn_ops_at), 'تسجيل زياد انستقرام': dt(d.ig_ops_at), 'تسجيل ملف العمليات': dt(d.ops_logged_at), 'طريقة الدفع': termsLabel(d), 'استحق الدفع': dt(payDueAt(d)), 'اعتماد الدفع': dt(d.pay_ok_at), 'الدفع': dt(d.paid_at), 'طلب انسحاب': dt(d.wd_req_at), 'سبب الانسحاب': d.wd_reason || '', 'المنتج بعد الانسحاب': d.wd_product || '', 'اعتماد الانسحاب': dt(d.wd_ok_at), 'بديل عن': d.replaces_id ? ((S.deals.find(x => x.id === d.replaces_id) || {}).name || '') : '' }));
   const infls = S.infl.map(i => ({ 'المعلن': i.name, 'بالإنجليزي': i.name_en, 'اليوزر': i.handle, 'رابط تيك توك': i.tiktok_url, 'نوع الحساب': i.acc_type, 'حالة الحساب': i.account_status, 'المرشِّح': memName(i.nominated_by), 'سجل النقل': transferText(i.transfers), 'تاريخ الترشيح': i.nominated_on, 'المصدر': i.source === 'acq' ? 'استقطاب' : i.source === 'campaign' ? 'حملة' : 'مستورد', 'حالة الاستقطاب': (ACQ[i.acq_status] || [i.acq_status])[0], 'سبب القرار': i.acq_reason, 'محاولات التواصل': (i.contacts || []).length, 'آخر نتيجة': ((i.contacts || []).slice(-1)[0] || {}).result || '', 'واجه مشكلة': i.had_problem == null ? '' : i.had_problem ? 'نعم' : 'لا', 'المشكلة': i.problem, 'المنصات': i.platforms, 'سناب': i.snap_user, 'انستقرام': i.ig_user, 'الجوال': i.phone, 'الدولة': i.country, 'المدينة': i.city, 'الحي والرمز': i.district, 'قبل التفاوض': i.price_before, 'بعد التفاوض': i.price_after, 'العملة': i.currency, 'تم الاتفاق': dt(i.agreed_at) }));
   const reqs = S.reqs.map(r => ({ 'النوع': REQ_KINDS[r.kind], 'العنوان': r.title, 'من': memName(r.from_member), 'إلى': memName(r.to_member), 'الموعد': r.due, 'الحالة': REQ_STATUS[r.status][0], 'جولات التعديل': r.rounds, 'تاريخ الطلب': dt(r.created_at), 'تاريخ التسليم': dt(r.done_at), 'التسليم': r.result_url }));
   const camps = S.camps.map(c => { const s = campStats(c.id); return { 'الحملة': c.name, 'الحالة': CAMP_ST[c.status || 'active'][0], 'المطلوب': c.target_total, 'موزّع': S.quotas.filter(q => q.campaign_id === c.id).reduce((x, q) => x + q.quota, 0), 'انرسل': s.sent.length, 'معتمد': s.approved.length, 'مرفوض': s.rejected.length, 'استلموا': s.approved.filter(d => d.delivered_at).length, 'نشروا': s.approved.filter(allDelivered).length }; });

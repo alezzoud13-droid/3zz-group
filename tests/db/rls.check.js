@@ -77,7 +77,7 @@ const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'
   expectBlocked('approver rewrites approved_by on own deal',await as('mitab',"update deals set approved_by=$2 where id=$1",[id,U.mitab]));}
  {await su("update campaigns set budget=(select coalesce(sum(price),0)+50 from deals where campaign_id=$1 and approval='approved' and closed_at is null) where id=$1",[camp]);
   const F=await fresh(10);expectBlocked('approver raises price of approved deal above budget',await as('mitab',"update deals set price=99999 where id=$1",[F.id]));
-  const G=await fresh(10);await as('mitab',"update deals set closed_at=now(),closed_reason='x' where id=$1",[G.id]);const H=await fresh(35);
+  const G=await fresh(10);await as('reem',"update deals set wd_req_at=now(),wd_reason='اعتذر' where id=$1",[G.id]);await as('mitab',"update deals set wd_ok_at=now(),wd_ok_by=$2,closed_at=now(),closed_reason='x' where id=$1",[G.id,U.mitab]);const H=await fresh(35);
   expectBlocked('reopen closed approved deal pushes over budget',await as('mitab',"update deals set closed_at=null,closed_reason='' where id=$1",[G.id]));
   await su("update campaigns set budget=50000000 where id=$1",[camp]);}
  {await as('admin',"insert into quotas(campaign_id,member_id,quota) values($1,$2,2) on conflict do nothing",[camp,U.reem]);
@@ -146,7 +146,7 @@ const expectAllowed=(name,r)=>{res.push([r.ok&&r.n>0?'ok  ':'BROKEN',name,r.ok?'
   expectAllowed('snap launches',await as('ziad',"update deals set sn_live_at=now() where id=$1",[id]).then(r=>r.ok&&r.n===0?{ok:true,n:1}:r));
   expectAllowed('admin approves payment',await as('admin',"update deals set pay_ok_at=now(),pay_ok_by=$2 where id=$1",[id,U.admin]));
   expectAllowed('approver records paid',await as('mitab',"update deals set paid_at=now() where id=$1",[id]));
-  expectAllowed('creator closes own file',await as('reem',"update deals set closed_at=now(),closed_reason='ما رد' where id=$1",[id]));
+  expectBlocked('creator closes own paid file (021: after payment only admin)',await as('reem',"update deals set closed_at=now(),closed_reason='ما رد' where id=$1",[id]));
   expectAllowed('admin reopens',await as('admin',"update deals set closed_at=null,closed_reason='',approval='pending',sent_at=null where id=$1",[id]));}
  {const x=await as('reem',"insert into deals(name,member_id,campaign_id,approval) values('D',$1,$2,'pending') returning id,intake_token",[U.reem,camp]);const id=x.rows[0].id;await as('mitab',"update deals set approval='approved' where id=$1",[id]);
   const t=await tokenOf(id);expectAllowed('influencer fills link (anon)',await as('anon',"select intake_submit($1,'{\"address\":\"A\"}'::jsonb,'{\"c\":1}'::jsonb) ok",[t]).then(r=>({...r,n:r.ok&&r.rows[0].ok?1:0})));
