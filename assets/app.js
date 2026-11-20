@@ -130,6 +130,16 @@ const infl = id => S.infl.find(x => x.id === id);
 const creators = () => active().filter(m => (m.roles || []).includes('creator'));
 const strictRole = (id, r) => ((mem(id) || {}).roles || []).includes(r);
 const quotaOf = (cid, mid) => (S.quotas.find(q => q.campaign_id === cid && q.member_id === mid) || {}).quota || 0;
+/* طريقة توزيع الحصص في الحملة: بالعدد، بالمبلغ، أو بالاثنين (قرار 20 نوفمبر) */
+const QMODES = { count: 'بعدد المقاطع', budget: 'بمبلغ الصرف', both: 'بالعدد والمبلغ' };
+const qMode = c => QMODES[(c || {}).quota_mode] ? c.quota_mode : 'count';
+const byCount = c => qMode(c) !== 'budget', byBudget = c => qMode(c) !== 'count';
+const quotaBudgetOf = (cid, mid) => Number((S.quotas.find(q => q.campaign_id === cid && q.member_id === mid) || {}).quota_budget) || 0;
+/* صرف الموظف الشغّال في الحملة: المُرسل أو المعتمد، غير المغلق وغير المرفوض (نفس حسبة قاعدة البيانات) */
+const memberSpend = (cid, mid) => S.deals.filter(d => d.campaign_id === cid && d.member_id === mid && !d.closed_at && d.approval !== 'rejected' && (d.sent_at || d.approval === 'approved')).reduce((s, d) => s + (Number(d.price) || 0), 0);
+const budgetLeft = (cid, mid) => { const b = quotaBudgetOf(cid, mid); return b ? Math.max(0, b - memberSpend(cid, mid)) : null; };
+const myQuotaLine = (cid, mid, c) => { const parts = []; if (byCount(c)) { const qn = quotaOf(cid, mid); parts.push(`${qn} ترشيح، باقي ${Math.max(0, qn - campStats(cid, mid).used)}`); }
+  if (byBudget(c)) { const b = quotaBudgetOf(cid, mid); parts.push(b ? `${fmt(b)} ريال، صرفت ${fmt(memberSpend(cid, mid))} وباقي ${fmt(budgetLeft(cid, mid))}` : 'بدون حد صرف'); } return parts.join(' · '); };
 /* من يعتمد شغل هذا الشخص؟ فصل المهام: شغل المعتمد نفسه يعتمده الأدمن */
 const adminName = () => (S.members.find(m => m.is_admin && m.active) || {}).name || 'عبدالمحسن';
 const apprNames = () => withRole('approver').filter(m => !m.is_admin).map(m => m.name).join('، ') || 'متعب';
@@ -628,18 +638,21 @@ function openCampNom(cid, preInfl) {
   if (!cid) {
     if (!live.length) return modal('<h2>ترشيح للحملة</h2><div class="empty">ما فيه حملات شغالة. عبدالمحسن يضيفها من «الحملات».</div><button class="btn" type="button" onclick="document.getElementById(\'ov\').hidden=true">إغلاق</button>', null, true);
     if (live.length === 1) return openCampNom(live[0].id, preInfl);
-    return modal(`<h2>ترشيح للحملة</h2><div class="field"><label for="cn_c">اختر الحملة</label><select id="cn_c">${live.map(c => `<option value="${c.id}">${esc(c.name)} — حصتك ${quotaOf(c.id, S.me.id)}</option>`).join('')}</select></div><div class="row"><button class="btn primary" id="cn_go" type="button">متابعة</button><button class="btn" id="cn_x" type="button">إلغاء</button></div>`, () => { $('cn_go').onclick = () => openCampNom($('cn_c').value, preInfl); $('cn_x').onclick = closeModal; }, true);
+    return modal(`<h2>ترشيح للحملة</h2><div class="field"><label for="cn_c">اختر الحملة</label><select id="cn_c">${live.map(c => `<option value="${c.id}">${esc(c.name)} — حصتك ${esc(myQuotaLine(c.id, S.me.id, c))}</option>`).join('')}</select></div><div class="row"><button class="btn primary" id="cn_go" type="button">متابعة</button><button class="btn" id="cn_x" type="button">إلغاء</button></div>`, () => { $('cn_go').onclick = () => openCampNom($('cn_c').value, preInfl); $('cn_x').onclick = closeModal; }, true);
   }
   const c = camp(cid), me = S.me.id, quota = quotaOf(cid, me), st = campStats(cid, me);
   /* نفس حسبة «مهامي»: المرفوض والمغلق ما يستهلكون الحصة */
   const fixes = st.fix, drafts = st.drafts, sentN = st.sent.filter(d => !d.closed_at && !['rejected', 'needs_edit'].includes(d.approval)).length;
-  const free = Math.max(0, quota - st.used);
+  const mode = qMode(c), qb = quotaBudgetOf(cid, me), leftB = budgetLeft(cid, me), spentB = memberSpend(cid, me);
+  const noQuota = mode === 'budget' ? !qb : !quota;                 /* بالمبلغ: الحد هو الريال مو العدد */
+  const free = mode === 'budget' ? (leftB > 0 ? 5 : 0) : Math.max(0, quota - st.used);
   let n = 0; const cards = [];
   fixes.forEach(d => cards.push(nomCard(++n, d))); drafts.forEach(d => cards.push(nomCard(++n, d)));
   for (let k = 0; k < free; k++) cards.push(nomCard(++n, null, k === 0 ? preInfl : null));
-  modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${quota} · أرسلت ${sentN} · ${fixes.length ? fixes.length + ' ترجع للتعديل · ' : ''}الباقي ${Math.max(0, quota - st.used)}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
-   ${!quota ? `<div class="dup">ما عندك حصة في هذي الحملة${isAdmin() ? ' — حدد لنفسك حصة من جدول الحصص في تبويب «الحملات»' : `. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية»`}.</div>` : ''}
-   ${!cards.length && quota ? `<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من ${esc(apprFor(S.me.id))}.</div>` : ''}
+  modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${esc(myQuotaLine(cid, me, c))} · أرسلت ${sentN}${fixes.length ? ' · ' + fixes.length + ' ترجع للتعديل' : ''}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
+   ${noQuota ? `<div class="dup">ما عندك حصة في هذي الحملة${isAdmin() ? ' — حدد لنفسك حصة من جدول الحصص في تبويب «الحملات»' : `. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية»`}.</div>` : ''}
+   ${byBudget(c) && qb ? `<div class="note">حدك في الصرف ${fmt(qb)} ريال: صرفت ${fmt(spentB)} وباقي لك ${fmt(leftB)}. مجموع مبالغ اللي ترسله ما يتجاوز الباقي.</div>` : ''}
+   ${!cards.length && !noQuota ? `<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من ${esc(apprFor(S.me.id))}.</div>` : ''}
    <div id="cn_cards" style="display:grid;gap:12px">${cards.join('')}</div>
    <div class="panel" style="position:sticky;bottom:0"><div class="row between"><b id="cn_count"></b>
     <div class="row"><button class="btn" id="cn_more" type="button">طلب ترشيحات إضافية</button>${cards.length ? '<button class="btn" id="cn_draft" type="button">حفظ كمسودة</button><button class="btn primary" id="cn_send" type="button">إرسال الترشيحات للاعتماد</button>' : ''}</div></div></div>`, root => {
@@ -658,6 +671,10 @@ function openCampNom(cid, preInfl) {
     let busy = false;
     const saveAll = async send => {
       if (busy) return; busy = true; root.querySelectorAll('#cn_draft,#cn_send').forEach(b => b.disabled = true);
+      /* حد الصرف: مجموع المبالغ المُرسلة + الشغّال ما يتجاوز حصة الموظف من الصرف */
+      if (send && qb) { const add = cardEls().filter(el => !isEmpty(el) && isDone(el)).reduce((s, el) => s + (Number(f(el, 'price')) || 0), 0);
+        if (memberSpend(cid, me) + add > qb) { busy = false; root.querySelectorAll('#cn_draft,#cn_send').forEach(b => b.disabled = false);
+          return toast(`مجموع هذي الترشيحات ${fmt(add)} + صرفك الحالي ${fmt(memberSpend(cid, me))} = ${fmt(memberSpend(cid, me) + add)}، وحدك ${fmt(qb)}. قلّل المبالغ أو اطلب زيادة حصة.`, true); } }
       const batch = crypto.randomUUID(); let saved = 0, sent = 0, bad = 0; const taken = [], why = [];
       for (const el of cardEls()) {
         if (isEmpty(el)) continue; const done = isDone(el);
@@ -690,9 +707,14 @@ function openCampNom(cid, preInfl) {
 }
 async function requestQuota(cid) {
   const c = camp(cid); const ap = isApprover() && !isAdmin() ? S.members.find(m => m.is_admin && m.active) : withRole('approver').filter(m => !m.is_admin || (m.roles || []).includes('approver'))[0];
-  const qty = await dialog(`<h3>طلب ترشيحات إضافية — ${esc(c.name)}</h3><div class="field"><label for="rq_n">كم ترشيح زيادة؟</label><input type="number" min="1" id="rq_n" value="2"></div><div class="field"><label for="rq_w">السبب</label><textarea id="rq_w"></textarea></div>`, box => { const n = Number(box.querySelector('#rq_n').value); if (!n || n < 1) { toast('اكتب العدد', true); return false; } return { n, w: box.querySelector('#rq_w').value.trim() }; });
+  const wantN = byCount(c), wantB = byBudget(c);
+  const qty = await dialog(`<h3>طلب زيادة حصة — ${esc(c.name)}</h3>${wantN ? `<div class="field"><label for="rq_n">كم ترشيح زيادة؟</label><input type="number" min="0" id="rq_n" value="${wantB ? 0 : 2}"></div>` : ''}${wantB ? `<div class="field"><label for="rq_b">كم مبلغ زيادة (ريال)؟</label><input type="number" min="0" id="rq_b" value="0"></div>` : ''}<div class="field"><label for="rq_w">السبب</label><textarea id="rq_w"></textarea></div>`, box => {
+    const n = wantN ? Number(box.querySelector('#rq_n').value) || 0 : 0, bb = wantB ? Number(box.querySelector('#rq_b').value) || 0 : 0;
+    if (n < 1 && bb < 1) { toast(wantB ? 'اكتب عدد الترشيحات أو المبلغ' : 'اكتب العدد', true); return false; }
+    const w = box.querySelector('#rq_w').value.trim(); if (!w) { toast('اكتب السبب', true); return false; } return { n, b: bb, w }; });
   if (!qty) return;
-  const r = await saveReq(null, { kind: 'quota', campaign_id: cid, qty: qty.n, title: `زيادة ${qty.n} ترشيح في حملة ${c.name}`, details: qty.w, to_member: ap ? ap.id : null, from_member: S.me.id });
+  const what = [qty.n ? `${qty.n} ترشيح` : '', qty.b ? `${fmt(qty.b)} ريال` : ''].filter(Boolean).join(' و');
+  const r = await saveReq(null, { kind: 'quota', campaign_id: cid, qty: qty.n, qty_budget: qty.b || null, title: `زيادة ${what} في حملة ${c.name}`, details: qty.w, to_member: ap ? ap.id : null, from_member: S.me.id });
   if (r) toast('انرسل الطلب لـ' + (ap ? ap.name : apprNames()));
 }
 
@@ -718,7 +740,7 @@ function renderCamps() {
     const people = ap || adm ? creators() : creators().filter(m => m.id === me);
     return `<div class="panel" data-camp="${c.id}">
      <div class="row between"><div class="row"><h2>${esc(c.name)}</h2><span class="pill ${CAMP_ST[c.status || 'active'][1]}">${CAMP_ST[c.status || 'active'][0]}</span>${c.product ? `<span class="muted small">${esc(c.product)}</span>` : ''}</div>
-      ${c.status === 'active' && hasRole(me, 'creator') ? `<button class="btn primary" data-nom="${c.id}" type="button">رشّح (حصتك ${myQ}، باقي ${Math.max(0, myQ - myS.used)})</button>` : ''}${c.status !== 'active' && adm ? `<button class="btn good" data-resume="${c.id}" type="button">أعدها شغالة</button>` : ''}</div>
+      ${c.status === 'active' && hasRole(me, 'creator') ? `<button class="btn primary" data-nom="${c.id}" type="button">رشّح (${esc(myQuotaLine(c.id, me, c))})</button>` : ''}${c.status !== 'active' && adm ? `<button class="btn good" data-resume="${c.id}" type="button">أعدها شغالة</button>` : ''}</div>
      <div class="tiles">
       <div class="tile"><span class="l">المطلوب</span><span class="v">${target || '—'}</span></div>
       <div class="tile"><span class="l">موزّع على الموظفين</span><span class="v">${quotaSum}</span></div>
@@ -740,11 +762,13 @@ function renderCamps() {
        <div class="field"><label>المنتج</label><input type="text" data-k="product" value="${esc(c.product)}"></div>
        <div class="field"><label>العدد المطلوب</label><input type="number" min="0" data-k="target_total" value="${c.target_total ?? ''}"></div>
        <div class="field"><label>سقف الصرف (ريال)</label><input type="number" min="0" data-k="budget" value="${c.budget ?? ''}"></div>
+       <div class="field"><label>توزيع الحصص على الموظفين</label><select data-k="quota_mode">${Object.entries(QMODES).map(([k, n]) => `<option value="${k}" ${qMode(c) === k ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
        <div class="field"><label>الحالة</label><select data-k="status">${Object.entries(CAMP_ST).map(([k, v]) => `<option value="${k}" ${c.status === k ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
       </div><button class="btn sm primary" data-csave type="button">حفظ</button></details>` : ''}
-     <div class="tw"><table><thead><tr><th>الموظف</th><th class="num">الحصة</th><th class="num">أرسل (شغّال)</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر الاعتماد</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); return `<tr><td>${esc(m.name)}</td><td class="num">${ap && (m.id !== me || adm) ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${s.live.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
+     <div class="tw"><table><thead><tr><th>الموظف</th>${byCount(c) ? '<th class="num">الحصة (عدد)</th>' : ''}${byBudget(c) ? '<th class="num">حصة الصرف</th><th class="num">صرف شغّال</th>' : ''}<th class="num">أرسل (شغّال)</th><th class="num">معتمد</th><th class="num">مرفوض</th><th class="num">يحتاج تعديل</th><th class="num">ينتظر الاعتماد</th></tr></thead><tbody>${people.map(m => { const s = campStats(c.id, m.id); const edq = ap && (m.id !== me || adm), spent = memberSpend(c.id, m.id), lim = quotaBudgetOf(c.id, m.id);
+       return `<tr><td>${esc(m.name)}</td>${byCount(c) ? `<td class="num">${edq ? `<input type="number" min="0" data-q="${m.id}" value="${quotaOf(c.id, m.id)}" style="width:80px;min-height:32px">` : quotaOf(c.id, m.id) + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td>` : ''}${byBudget(c) ? `<td class="num">${edq ? `<input type="number" min="0" data-qb="${m.id}" value="${lim || ''}" placeholder="بدون حد" style="width:100px;min-height:32px">` : (lim ? fmt(lim) : '—') + (ap && m.id === me ? ' <span class="muted small">(يحددها عبدالمحسن)</span>' : '')}</td><td class="num">${lim && spent > lim ? `<span class="pill bad">${fmt(spent)}</span>` : fmt(spent)}</td>` : ''}<td class="num">${s.live.length}</td><td class="num">${s.approved.length}</td><td class="num">${s.rejected.length || ''}</td><td class="num">${s.fix.length || ''}</td><td class="num">${s.pending.length || ''}</td></tr>`; }).join('')}</tbody></table></div>
      <div class="muted small">«أرسل (شغّال)» يعد الترشيحات القائمة فقط. المرفوض والمغلق يبقون في السجل لكن ما ياخذون من الحصة، فالموظف يقدر يرشّح بدالهم — عشان كذا تلقى مجموع ما أُرسل تاريخياً أكبر من المطلوب.</div>
-     ${ap ? `<div class="row"><button class="btn sm primary" data-qsave type="button">حفظ الحصص</button><button class="btn sm" data-qeven type="button">وزّع المطلوب بالتساوي</button><span class="muted small">مجموع الحصص ${quotaSum}${target ? ' من ' + target : ''}</span></div>` : ''}
+     ${ap ? `<div class="row"><button class="btn sm primary" data-qsave type="button">حفظ الحصص</button><button class="btn sm" data-qeven type="button">وزّع المطلوب بالتساوي</button><span class="muted small">${byCount(c) ? `مجموع الحصص ${quotaSum}${target ? ' من ' + target : ''}` : ''}${byBudget(c) ? `${byCount(c) ? ' · ' : ''}موزّع من الصرف ${fmt(S.quotas.filter(q => q.campaign_id === c.id).reduce((s, q) => s + (Number(q.quota_budget) || 0), 0))}${Number(c.budget) > 0 ? ' من ' + fmt(Number(c.budget)) : ''}` : ''}</span></div>` : ''}
     </div>`;
   }).join('') || '<div class="empty">ما فيه حملات. عبدالمحسن يضيفها من «+ حملة».</div>';
 }
@@ -765,14 +789,24 @@ function actAs(id) {
 }
 document.addEventListener('click', e => { const b = e.target.closest('[data-act-as]'); if (b && isAdmin()) actAs(b.dataset.actAs); });
 $('actExit').onclick = () => actAs(null);
-$('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div><div class="field"><label for="nc_b">سقف الصرف بالريال (اختياري)</label><input type="number" min="0" id="nc_b"></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, budget: Number(box.querySelector('#nc_b').value) || null, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
+$('campAdd').onclick = async () => { const r = await dialog(`<h3>حملة جديدة</h3><div class="field"><label for="nc_n">اسم الحملة</label><input type="text" id="nc_n"></div><div class="field"><label for="nc_p">المنتج</label><input type="text" id="nc_p"></div><div class="field"><label for="nc_t">العدد المطلوب من الترشيحات</label><input type="number" min="0" id="nc_t"></div><div class="field"><label for="nc_b">سقف الصرف بالريال (اختياري)</label><input type="number" min="0" id="nc_b"></div><div class="field"><label for="nc_m">توزيع الحصص على الموظفين</label><select id="nc_m">${Object.entries(QMODES).map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select></div>`, box => { const n = box.querySelector('#nc_n').value.trim(); if (!n) { toast('اكتب اسم الحملة', true); return false; } return { name: n, product: box.querySelector('#nc_p').value.trim(), target_total: Number(box.querySelector('#nc_t').value) || null, budget: Number(box.querySelector('#nc_b').value) || null, quota_mode: box.querySelector('#nc_m').value, status: 'active', active: true }; }); if (!r) return; const c = await q(sb.from('campaigns').insert(r).select().single()); if (c) { S.camps.unshift(c); toast('انضافت الحملة. ' + apprNames() + ' يوزّع الحصص'); renderCamps(); } };
 $('cList').addEventListener('click', async e => {
   const nb = e.target.closest('[data-nom]'); if (nb) return openCampNom(nb.dataset.nom);
   const rs = e.target.closest('[data-resume]'); if (rs) { const r = await q(sb.from('campaigns').update({ status: 'active', active: true }).eq('id', rs.dataset.resume).select().single()); if (r) { upsertLocal(S.camps, r); S.campView = 'active'; toast('رجعت شغالة ✓ — صارت تظهر للفريق كله وزر «رشّح» انفتح لهم'); renderCamps(); } return; }
   const box = e.target.closest('[data-camp]'); if (!box) return; const cid = box.dataset.camp;
   if (e.target.closest('[data-csave]')) { const ch = {}; box.querySelectorAll('[data-k]').forEach(x => ch[x.dataset.k] = x.type === 'number' ? (x.value === '' ? null : Number(x.value)) : x.value.trim()); ch.active = ch.status !== 'ended'; const r = await q(sb.from('campaigns').update(ch).eq('id', cid).select().single()); if (r) { upsertLocal(S.camps, r); toast('انحفظ'); renderCamps(); } }
-  if (e.target.closest('[data-qeven]')) { const t = camp(cid).target_total; const inputs = [...box.querySelectorAll('[data-q]')]; if (!t) return toast('عبدالمحسن ما حدد العدد المطلوب للحملة', true); const base = Math.floor(t / inputs.length), extra = t % inputs.length; inputs.forEach((x, k) => x.value = base + (k < extra ? 1 : 0)); toast('وزّعت بالتساوي، راجعها واضغط حفظ'); }
-  if (e.target.closest('[data-qsave]')) { const rows = [...box.querySelectorAll('[data-q]')].map(x => ({ campaign_id: cid, member_id: x.dataset.q, quota: Number(x.value) || 0, updated_by: S.me.id }));
+  if (e.target.closest('[data-qeven]')) { const cQ = camp(cid); const inputs = [...box.querySelectorAll('[data-q]')], binputs = [...box.querySelectorAll('[data-qb]')]; const done = [];
+    if (byCount(cQ)) { const t = cQ.target_total; if (!t) return toast('عبدالمحسن ما حدد العدد المطلوب للحملة', true);
+      const base = Math.floor(t / inputs.length), extra = t % inputs.length; inputs.forEach((x, k) => x.value = base + (k < extra ? 1 : 0)); done.push('العدد'); }
+    if (byBudget(cQ)) { const b = Number(cQ.budget) || 0; if (!b) return toast('عبدالمحسن ما حدد سقف الصرف للحملة', true);
+      const per = Math.floor(b / binputs.length / 50) * 50; binputs.forEach((x, k) => x.value = per + (k === 0 ? b - per * binputs.length : 0)); done.push('المبلغ'); }
+    toast(`وزّعت ${done.join(' و')} بالتساوي، راجعها واضغط حفظ`); }
+  if (e.target.closest('[data-qsave]')) { const cQ = camp(cid); const qbOf = mid => { const el = box.querySelector(`[data-qb="${mid}"]`); return el ? (el.value === '' ? null : Number(el.value) || 0) : quotaBudgetOf(cid, mid) || null; };
+    const ids = byCount(cQ) ? [...box.querySelectorAll('[data-q]')].map(x => x.dataset.q) : [...box.querySelectorAll('[data-qb]')].map(x => x.dataset.qb);
+    const rows = ids.map(mid => { const el = box.querySelector(`[data-q="${mid}"]`); return { campaign_id: cid, member_id: mid, quota: el ? Number(el.value) || 0 : quotaOf(cid, mid), quota_budget: qbOf(mid), updated_by: S.me.id }; });
+    if (byBudget(cQ) && Number(cQ.budget) > 0) { const othersB = S.quotas.filter(y => y.campaign_id === cid && !rows.some(x => x.member_id === y.member_id)).reduce((s, y) => s + (Number(y.quota_budget) || 0), 0);
+      const sumB = othersB + rows.reduce((s, x) => s + (x.quota_budget || 0), 0);
+      if (sumB > Number(cQ.budget)) return toast(`مجموع حصص الصرف ${fmt(sumB)} وسقف الحملة ${fmt(Number(cQ.budget))}. قلّل التوزيع أو ارفع السقف من إعدادات الحملة.`, true); }
     const tgt = camp(cid).target_total; const others = S.quotas.filter(y => y.campaign_id === cid && !rows.some(x => x.member_id === y.member_id)).reduce((s, y) => s + y.quota, 0); const sum = others + rows.reduce((s, x) => s + x.quota, 0);
     if (tgt && sum > tgt) return toast(`مجموع الحصص بيصير ${sum} والعدد المطلوب للحملة ${tgt}. ما ينوزع أكثر من اللي حدده عبدالمحسن — اعتمد طلب زيادة ترشيح أو زد «العدد المطلوب» أولاً.`, true);
     const r = await q(sb.from('quotas').upsert(rows).select()); if (r) { r.forEach(x => { const k = S.quotas.findIndex(y => y.campaign_id === x.campaign_id && y.member_id === x.member_id); if (k >= 0) S.quotas[k] = x; else S.quotas.push(x); }); toast('انحفظت الحصص'); renderCamps(); } }
@@ -838,7 +872,9 @@ function queuesFor(id) {
     if (k === 'ops') continue;   /* تسجيل زياد صار لكل منصة في الحلقة فوق */
     if (d.member_id === id) add(k, { d, i });
   }
-  if (id !== 'admin' && strictRole(id, 'creator')) for (const c of S.camps.filter(c => c.status === 'active')) { const qn = quotaOf(c.id, id); const s = campStats(c.id, id); if (qn > s.used) add('camp_quota', { c, left: qn - s.used }); }
+  if (id !== 'admin' && strictRole(id, 'creator')) for (const c of S.camps.filter(c => c.status === 'active')) { const qn = quotaOf(c.id, id), s = campStats(c.id, id), lb = budgetLeft(c.id, id);
+    const left = Math.max(0, qn - s.used); const show = qMode(c) === 'budget' ? lb > 0 : left > 0;
+    if (show) add('camp_quota', { c, left, leftB: lb }); }
   /* تنبيه سقف الصرف: لعبدالمحسن ومتعب عند 80% فأكثر */
   if (id === 'admin' || isAp) for (const c of S.camps.filter(c => (c.status || 'active') === 'active' && Number(c.budget) > 0)) { const bp = budgetPct(c); if (bp != null && bp >= 80) add('budget_alert', { c, pct: bp }); }
   for (const r of S.reqs) {
@@ -908,7 +944,7 @@ function renderMine() {
     const hasChecks = !!b || k === 'ops';   /* مربعات تحديد: للإجراء الجماعي ولتنزيل شيت التشغيل للمحدد */
     let rows;
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
-    else if (k === 'camp_quota') rows = L.map(({ c, left }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي ${foreign ? 'له' : 'لك'} ${left} ترشيح</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button>`}</div></div>`).join('');
+    else if (k === 'camp_quota') rows = L.map(({ c, left, leftB }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي ${foreign ? 'له' : 'لك'} ${esc([byCount(c) ? `${left} ترشيح` : '', byBudget(c) && leftB != null ? `${fmt(leftB)} ريال` : ''].filter(Boolean).join(' و'))}</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button>`}</div></div>`).join('');
     else if (k === 'budget_alert') rows = L.map(({ c, pct: bp }) => `<div class="qrow ${bp >= 100 ? 'late' : ''}"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">المعتمد ${fmt(campSpend(c.id))} من سقف ${fmt(Number(c.budget))} ريال${bp >= 100 ? ' — الاعتمادات الجديدة مرفوضة إلا منك أو بعد رفع السقف' : ''}</div></div><div class="acts"><span class="pill ${bp >= 100 ? 'bad' : 'warn'}">${bp}٪</span><a class="btn sm" href="#camps">افتح الحملة</a></div></div>`).join('');
     else if (L[0].i && L[0].i.acq_status !== undefined && !L[0].d) rows = L.map(x => inflRow(x.i)).join('');
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
@@ -1388,9 +1424,9 @@ async function openReq(id) {
       if (k === 'fix' || k === 'reopen') { const why = await reasonBox('وش المطلوب تعديله بالضبط؟', true); if (why == null || !why.trim()) return fail();
         return (await reqAct(r, { status: 'fix', rounds: (r.rounds || 0) + 1, done_at: null }, k, why.trim())) ? done('رجع للتعديل، وبيوصله إشعار') : fail(); }
       if (k === 'cancel') { if (!await confirmBox('تلغي هذا الطلب؟')) return fail(); return (await reqAct(r, { status: 'cancelled' }, 'cancel', '')) ? done('انلغى الطلب') : fail(); }
-      if (k === 'qok') { const { data: newq, error } = await sb.rpc('quota_grant', { p_campaign: r.campaign_id, p_member: r.from_member, p_qty: r.qty || 0 }); if (error || newq == null) { toast(friendly(error || 'ما نفعت'), true); return fail(); }
-        const kq = S.quotas.findIndex(y => y.campaign_id === r.campaign_id && y.member_id === r.from_member); if (kq >= 0) S.quotas[kq].quota = newq; else S.quotas.push({ campaign_id: r.campaign_id, member_id: r.from_member, quota: newq });
-        const cc = camp(r.campaign_id); if (cc && cc.target_total != null) cc.target_total += (r.qty || 0);
+      if (k === 'qok') { const { data: g, error } = await sb.rpc('quota_grant_b', { p_campaign: r.campaign_id, p_member: r.from_member, p_qty: r.qty || 0, p_budget: Number(r.qty_budget) || 0 }); if (error || !g) { toast(friendly(error || 'ما نفعت'), true); return fail(); }
+        const newq = g.quota; const kq = S.quotas.findIndex(y => y.campaign_id === r.campaign_id && y.member_id === r.from_member); if (kq >= 0) { S.quotas[kq].quota = newq; S.quotas[kq].quota_budget = g.quota_budget; } else S.quotas.push({ campaign_id: r.campaign_id, member_id: r.from_member, quota: newq, quota_budget: g.quota_budget });
+        const cc = camp(r.campaign_id); if (cc && cc.target_total != null) cc.target_total += (r.qty || 0); if (cc && cc.budget != null && Number(r.qty_budget)) cc.budget = Number(cc.budget) + Number(r.qty_budget);
         return (await reqAct(r, { status: 'done', done_at: nowIso() }, 'quota_ok', `الحصة صارت ${newq}، والعدد المطلوب للحملة زاد بنفس المقدار`)) ? done('زادت الحصة وزاد العدد المطلوب للحملة') : fail(); }
       if (k === 'qno') { const why = await reasonBox('سبب الرفض', false); if (why == null) return fail(); return (await reqAct(r, { status: 'cancelled' }, 'quota_no', why.trim())) ? done('انرفض الطلب') : fail(); }
     });

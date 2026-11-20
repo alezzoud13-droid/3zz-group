@@ -247,6 +247,21 @@
       else { q = { campaign_id: p_campaign, member_id: p_member, quota: p_qty, updated_by: uid(), updated_at: nowIso() }; DB.quotas.push(q); }
       return q.quota;
     },
+    /* التحديث 22: زيادة بالعدد و/أو بالمبلغ */
+    quota_grant_b({ p_campaign, p_member, p_qty, p_budget }) {
+      p_qty = p_qty || 0; p_budget = p_budget || 0;
+      if (p_qty < 0 || p_budget < 0) throw err('قيمة الزيادة غير صحيحة', 'P0001');
+      if (!p_qty && !p_budget) throw err('حدد عدد الترشيحات أو مبلغ الزيادة', 'P0001');
+      if (!(isAdmin() || hasRole('approver'))) throw err('اعتماد زيادة الحصص لمتعب أو عبدالمحسن فقط', 'P0001');
+      if (p_member === uid() && !isAdmin()) throw err('زيادة حصتك يعتمدها عبدالمحسن، مو أنت', 'P0001');
+      const c = DB.campaigns.find(x => x.id === p_campaign);
+      if (c && p_qty && c.target_total != null) c.target_total += p_qty;
+      if (c && p_budget && c.budget != null) c.budget = Number(c.budget) + p_budget;
+      let q = DB.quotas.find(x => x.campaign_id === p_campaign && x.member_id === p_member);
+      if (q) Object.assign(q, { quota: q.quota + p_qty, quota_budget: p_budget ? (Number(q.quota_budget) || 0) + p_budget : q.quota_budget, updated_by: uid(), updated_at: nowIso() });
+      else { q = { campaign_id: p_campaign, member_id: p_member, quota: p_qty, quota_budget: p_budget || null, updated_by: uid(), updated_at: nowIso() }; DB.quotas.push(q); }
+      return { quota: q.quota, quota_budget: q.quota_budget };
+    },
     intake_get({ p_token }) {
       const d = DB.deals.find(x => x.intake_token === p_token && x.approval === 'approved' && !x.closed_at); if (!d) return null;
       const c = DB.campaigns.find(x => x.id === d.campaign_id), bp = DB.settings.find(s => s.key === 'bank_pub');
