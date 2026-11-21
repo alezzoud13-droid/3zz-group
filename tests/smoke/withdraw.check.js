@@ -51,8 +51,11 @@ let pass = 0, fail = 0; const ok = (c, n) => { c ? pass++ : fail++; console.log(
   ok(await p.$(`${M} [data-g="wd_review"]`) !== null, 'المعتمد يشوف «طلبات انسحاب تنتظر اعتمادك»');
   await p.screenshot({ path: '/tmp/wd_approver.png' });
   await p.click(`${M} [data-g="wd_review"] [data-open="${rq}"]`); await p.waitForTimeout(400);
-  await reset(p); await p.click('[data-act="wdok"]'); await p.waitForSelector('.ov.top [data-y]'); await p.click('.ov.top [data-y]'); await p.waitForTimeout(400);
+  await reset(p); await p.click('[data-act="wdok"]'); await p.waitForSelector('.ov.top #wdc');
+  await p.click('.ov.top [data-y]'); await p.waitForTimeout(250); ok(await nW(p) === 0 && !!(await p.$('.ov.top #wdc')), 'اعتماد الانسحاب بدون سبب: ما ينحفظ');
+  await p.selectOption('.ov.top #wdc', 'company'); await p.click('.ov.top [data-y]'); await p.waitForTimeout(400);
   w = await lastW(p); ok(w && w.payload && w.payload.wd_ok_at && w.payload.closed_at, 'اعتماد الانسحاب يقفل الملف');
+  ok(w && w.payload && w.payload.wd_cause === 'company', 'اعتماد الانسحاب يحفظ السبب (قرار الشركة)');
   await p.click('#dClose'); await p.waitForTimeout(300);
   /* مدفوع سابقاً / بعقد */
   const tid = await p.$eval(`${M} [data-g="terms"] [data-terms]`, e => e.dataset.terms).catch(() => null);
