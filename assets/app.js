@@ -387,6 +387,18 @@ async function idClashes(ids, exceptId) {
   }
   return out;
 }
+/* البيانات التعريفية الإلزامية في كل مرحلة (21 نوفمبر): الاسم عربي وإنجليزي، الجوال، ويوزر كل منصة ينزل عليها.
+   نفس القاعدة في قاعدة البيانات (التحديث 25): أي مرحلة ما تتقدّم وملف المؤثر ناقص. */
+function idMissing(i, keys) {
+  if (!i) return ['ملف المؤثر']; const m = [];
+  if (!String(i.name || '').trim()) m.push('الاسم'); if (!String(i.name_en || '').trim()) m.push('الاسم بالإنجليزي'); if (!ph9(i.phone)) m.push('الجوال');
+  keys = keys || platKeys(i);
+  if (keys.includes('tt') && !handleOf(i.handle || i.tiktok_url || '')) m.push('يوزر تيك توك');
+  if (keys.includes('sn') && !uname(i.snap_user)) m.push('يوزر سناب');
+  if (keys.includes('ig') && !uname(i.ig_user)) m.push('يوزر انستقرام');
+  return m;
+}
+const activeKeys = i => [...new Set(S.deals.filter(d => d.influencer_id === i.id && !isClosed(d)).flatMap(platKeys))];
 const clashMsg = c => `${IDF[c.field]} مسجّل للمؤثر «${c.name}»${c.owner_name ? ' عند ' + c.owner_name : ''}`;
 /* الحساب عند زميل؟ الموظف ما يشوف ملفات غيره، فنسأل قاعدة البيانات: ترجع الاسم وصاحب الترشيح فقط */
 const seesAll = () => isAdmin() || isApprover();
@@ -441,7 +453,7 @@ function openAcqNew() {
       const cl = await idClashes({ tt: handle, sn: uname(sn), ig: uname(ig), ph: ph9(phone) });
       if (cl.length) return toast(`${clashMsg(cl[0])} — ما ينفع ينسجّل مرتين. إذا هو نفس المؤثر افتح ملفه الموجود.`, true);
       root.querySelectorAll('button').forEach(b => b.disabled = true);
-      const r = await saveInfl(null, { name, name_en, tiktok_url: url, handle, phone, snap_user: sn, ig_user: ig, platforms: platText(keys), acc_type: type, account_status: $('q_status').value, nominated_on: $('q_date').value || today(), nominated_by: S.me.id, source: 'acq', acq_status: send ? 'pending' : 'draft', acq_sent_at: send ? nowIso() : null });
+      const r = await saveInfl(null, { name, name_en, tiktok_url: url, handle, phone, snap_user: uname(sn), ig_user: uname(ig), platforms: platText(keys), acc_type: type, account_status: $('q_status').value, nominated_on: $('q_date').value || today(), nominated_by: S.me.id, source: 'acq', acq_status: send ? 'pending' : 'draft', acq_sent_at: send ? nowIso() : null });
       root.querySelectorAll('button').forEach(b => b.disabled = false);
       if (r) { toast(send ? 'انرسل للمراجعة عند ' + apprFor(S.me.id) : 'انحفظ كمسودة'); openInfl(r.id); }
     };
@@ -470,6 +482,7 @@ function openInfl(id) {
   modal(`<div class="row between"><div><h2>${esc(i.name)}</h2><div class="muted small">${esc([i.acc_type, i.account_status, i.handle ? '@' + i.handle : '', 'رشّحه ' + memName(i.nominated_by) + ' ' + (i.nominated_on || '')].filter(Boolean).join(' · '))}</div></div>
    <div class="row"><span class="pill ${(ACQ[st] || ['', ''])[1]}">${i.agreed_at ? 'تم الاتفاق' : (ACQ[st] || [st])[0]}</span><button class="btn" id="f_x" type="button">إغلاق</button></div></div>
   ${acctLinks(null, i) ? `<div class="row">${acctLinks(null, i)}</div>` : ''}
+  ${(() => { const mi = idMissing(i, [...new Set([...keys, ...activeKeys(i)])]); return mi.length ? `<div class="dup"><b>ناقص بيانات تعريفية:</b> ${esc(mi.join('، '))} — بدونها ما تمشي أي مرحلة في ترشيحاته. ${owner ? 'كمّلها تحت في «منصات التنزيل والحسابات» و«بيانات التواصل» واحفظ.' : 'يكمّلها ' + esc(memName(i.nominated_by)) + '.'}</div>` : ''; })()}
   ${(st === 'needs_edit' || st === 'rejected') && i.acq_reason.trim() ? `<div class="dup"><b>${st === 'rejected' ? 'سبب الرفض' : 'المطلوب تعديله'}:</b> ${esc(i.acq_reason)}</div>` : ''}
   ${transferNote(i.transfers)}
 
@@ -503,11 +516,12 @@ function openInfl(id) {
     <h3>منصات التنزيل والحسابات</h3>
     ${platChecks('i', keys)}
     <div class="grid2">
-     <div class="field" data-for="sn" ${keys.includes('sn') ? '' : 'hidden'}><label for="i_snap_user">يوزر سناب شات</label><input type="text" id="i_snap_user" dir="ltr" value="${v('snap_user')}"></div>
-     <div class="field" data-for="ig" ${keys.includes('ig') ? '' : 'hidden'}><label for="i_ig_user">رابط أو يوزر انستقرام</label><input type="text" id="i_ig_user" dir="ltr" value="${v('ig_user')}"></div>
+     <div class="field" data-for="sn" ${keys.includes('sn') ? '' : 'hidden'}><label for="i_snap_user">يوزر سناب شات *</label><input type="text" id="i_snap_user" dir="ltr" value="${v('snap_user')}"></div>
+     <div class="field" data-for="ig" ${keys.includes('ig') ? '' : 'hidden'}><label for="i_ig_user">يوزر انستقرام *</label><input type="text" id="i_ig_user" dir="ltr" value="${v('ig_user')}"></div>
     </div>
     <h3>بيانات التواصل والعنوان</h3>
     <div class="grid2">
+     ${editable1 ? '' : `<div class="field"><label for="i_name_en2">الاسم بالإنجليزي *</label><input type="text" id="i_name_en2" dir="ltr" value="${v('name_en')}"></div>`}
      <div class="field"><label for="i_phone">رقم الجوال *</label><input type="tel" id="i_phone" dir="ltr" value="${v('phone')}" placeholder="05xxxxxxxx أو +971..."></div>
      <div class="field"><label for="i_country">الدولة</label><input type="text" id="i_country" list="dlCountries" value="${v('country')}"></div>
      <div class="field"><label for="i_city">المدينة</label><input type="text" id="i_city" list="dlCities" value="${v('city')}"></div>
@@ -550,11 +564,16 @@ function openInfl(id) {
       const prob = root.querySelector('[name=i_prob]:checked'); const k = readPlats(root, 'i');
       const phone = normPhone($('i_phone').value);
       if ($('i_phone').value.trim() && phone === null) { toast('رقم الجوال مو صحيح. السعودي يبدأ بـ 05، والدولي بـ + ومفتاح الدولة', true); return null; }
-      if (strict && !phone) { toast('رقم الجوال إلزامي', true); return null; }
+      const en2 = $('i_name_en2') ? $('i_name_en2').value.trim() : (i.name_en || '');
+      const miss = []; if (!phone) miss.push('الجوال'); if (!en2) miss.push('الاسم بالإنجليزي');
+      if (k.includes('sn') && !$('i_snap_user').value.trim()) miss.push('يوزر سناب'); if (k.includes('ig') && !$('i_ig_user').value.trim()) miss.push('يوزر انستقرام');
+      if (k.includes('tt') && !handleOf(i.handle || i.tiktok_url || '')) miss.push('يوزر تيك توك (من بيانات الترشيح)');
+      if (miss.length) { toast('البيانات التعريفية إلزامية — ناقص: ' + miss.join('، '), true); return null; }
       if (prob && prob.value === 'yes' && !$('i_problem').value.trim()) { toast('اكتب تفاصيل المشكلة', true); return null; }
       const pb = $('i_price_before').value, pa = $('i_price_after').value;
       return { contacts: readContacts(), had_problem: prob ? prob.value === 'yes' : null, problem: prob && prob.value === 'yes' ? $('i_problem').value.trim() : '', contact_summary: $('i_contact_summary').value.trim(),
-        platforms: platText(k), snap_user: k.includes('sn') ? $('i_snap_user').value.trim() : i.snap_user, ig_user: k.includes('ig') ? $('i_ig_user').value.trim() : i.ig_user,
+        ...($('i_name_en2') ? { name_en: $('i_name_en2').value.trim() } : {}),
+        platforms: platText(k), snap_user: k.includes('sn') ? uname($('i_snap_user').value) : i.snap_user, ig_user: k.includes('ig') ? uname($('i_ig_user').value) : i.ig_user,
         phone: phone || '', country: $('i_country').value.trim(), city: $('i_city').value.trim(), district: $('i_district').value.trim(),
         price_before: pb === '' ? null : Number(pb), price_after: pa === '' ? null : Number(pa), currency: $('i_currency').value };
     };
@@ -741,6 +760,7 @@ function openCampNom(cid, preInfl) {
         if (url && shortLink(url)) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: الرابط المختصر ما ينقرأ منه اليوزر. افتح الحساب وانسخ رابطه الكامل (tiktok.com/@اليوزر)`); continue; }
         // ملف المؤثر: نستخدم الموجود أو ننشئ جديد
         let iid = el.dataset.infl || ''; const handle = url ? handleOf(url) : '';
+        if (!phone && !iid) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: الجوال إلزامي — ما ينحفظ مؤثر بدون جوال حتى كمسودة`); continue; }
         const ids = { tt: handle, sn: uname(f(el, 'sn_user')), ig: uname(f(el, 'ig_user')), ph: ph9(phone) };
         const cl = await idClashes(ids, iid);
         if (cl.length) {
@@ -751,7 +771,7 @@ function openCampNom(cid, preInfl) {
         }
         if (iid) { const fx = infl(iid), bad1 = idConflict(fx, ids); if (bad1) { taken.push(`الترشيح ${el.dataset.card}: ${IDF[bad1]} اللي كتبته ما يطابق ملف «${fx.name}». إذا هذا مؤثر ثاني، افتح بطاقة جديدة له.`); el.classList.add('part'); continue; }
           if (S.deals.some(x => x.influencer_id === iid && x.campaign_id === cid && x.id !== el.dataset.deal && !isClosed(x))) { taken.push(`الترشيح ${el.dataset.card}: «${fx ? fx.name : ''}» مرشّح في هذي الحملة من قبل.`); el.classList.add('part'); continue; } }
-        const inflData = { name: f(el, 'name'), name_en: f(el, 'name_en') || translit(f(el, 'name')), tiktok_url: url, handle, acc_type: f(el, 'acc_type'), phone: phone || '', country: f(el, 'country'), city: f(el, 'city'), district: f(el, 'district'), snap_user: f(el, 'sn_user'), ig_user: f(el, 'ig_user'), platforms: platText(keys), account_status: f(el, 'status') };
+        const inflData = { name: f(el, 'name'), name_en: f(el, 'name_en') || translit(f(el, 'name')), tiktok_url: url, handle, acc_type: f(el, 'acc_type'), phone: phone || '', country: f(el, 'country'), city: f(el, 'city'), district: f(el, 'district'), snap_user: uname(f(el, 'sn_user')), ig_user: uname(f(el, 'ig_user')), platforms: platText(keys), account_status: f(el, 'status') };
         if (iid) { const cur = infl(iid); const fillEmpty = {}; for (const k in inflData) if (inflData[k] && !cur[k]) fillEmpty[k] = inflData[k]; if (Object.keys(fillEmpty).length) await saveInfl(iid, fillEmpty); }
         else { const r = await saveInfl(null, { ...inflData, nominated_by: me, source: 'campaign', acq_status: 'none' }); if (!r) { bad++; continue; } iid = r.id; el.dataset.infl = iid; }
         const price = f(el, 'price');
@@ -883,12 +903,12 @@ $('cList').addEventListener('click', async e => {
 /* ================= مهامي ================= */
 const QL = {
   members: 'حسابات جديدة تنتظر التفعيل', budget_alert: 'حملات قربت من سقف الصرف أو تجاوزته', acq_review: 'استقطاب ينتظر اعتمادك', appr: 'ترشيحات حملات تنتظر اعتمادك', quota_req: 'طلبات زيادة حصة',
-  acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
+  id_fix: 'كمّل البيانات التعريفية — بدونها ما تمشي أي مرحلة (اعتماد، شحن، نشر، دفع)', acq_fix: 'استقطاب رجع لك للتعديل', camp_fix: 'ترشيحات حملات رجعت للتعديل', acq_draft: 'استقطاب محفوظ كمسودة', camp_draft: 'ترشيحات حملات محفوظة كمسودة', camp_quota: 'حصص ترشيح ما خلصت',
   acq_contact: 'معتمد: تواصل وفاوض', intake: 'معتمد: كمّل العنوان أو أرسل الرابط للمؤثر', ship_send: 'جاهزة للشحن', ship_wait: 'في الطريق: سجّل الوصول', ship_fail: 'تعذّر التسليم: تابعها',
   video: 'وصله المنتج: أرسل المقطع الخام للمراجعة', video_fix: 'مقاطع رجعت لك للتعديل', draft: 'مقاطع خام تنتظر اعتمادك', post: 'المقطع معتمد: سجّل النزول والكود لكل منصة',
   launch: 'نزل وسجّله زياد: شغّل الإعلان', ops: 'نزلت المنصة: سجّلها في ملف العمليات (شيت التشغيل) وعلّم «سجّلت» — كل منصة مستقلة', req_in: 'طلبات عليك', req_fix: 'طلبات رجعت لك للتعديل', req_new: 'تحديثات جديدة على طلباتك (ردود، تعديلات، تسليمات)', req_review: 'طلبات سلّموها لك: راجعها', wd_review: 'طلبات انسحاب من الحملة تنتظر اعتمادك', replace: 'انسحب من الحملة: رشّح بديل في مكانه', wd_paid: 'انسحب بعد ما اعتمدت دفعه (للعلم — ما راح يطلع في كشف المالية)', pay: 'مسار الدفع ١: استحق دفعها وتنتظر موافقتك (الأعلى تقفل مرحلة)', terms: 'حدد طريقة الدفع لكل ملف (مقدم / قبل النشر / بعد النشر)', pay_go: 'مسار الدفع ٢: معتمدة للدفع — نزّل الكشف وأرسله للمالية، وبعد التحويل علّم «تم الدفع»', park: 'احتياط'
 };
-const QO = ['members', 'budget_alert', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'wd_review', 'terms', 'draft', 'req_review', 'replace', 'wd_paid', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'ops', 'launch', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'pay_go', 'park'];
+const QO = ['members', 'id_fix', 'budget_alert', 'req_new', 'req_fix', 'acq_review', 'appr', 'quota_req', 'wd_review', 'terms', 'draft', 'req_review', 'replace', 'wd_paid', 'acq_fix', 'camp_fix', 'video_fix', 'ship_fail', 'ship_send', 'ship_wait', 'ops', 'launch', 'req_in', 'camp_quota', 'acq_draft', 'camp_draft', 'acq_contact', 'intake', 'video', 'post', 'pay', 'pay_go', 'park'];
 const BULK = {
   appr: ['اعتماد', () => ({ approval: 'approved', approved_at: nowIso(), approved_by: S.me.id, decision_reason: '' })],
   ship_send: ['تم الشحن اليوم', () => ({ shipped_at: nowIso() })],
@@ -906,7 +926,8 @@ function queuesFor(id) {
   for (const i of S.infl) {
     if (id === 'admin') { if (i.acq_status === 'pending' && apOwn(i.nominated_by)) add('acq_review', { i }); continue; }
     if (i.acq_status === 'pending' && isAp && i.nominated_by !== id) add('acq_review', { i });
-    if (i.nominated_by === id) { if (i.acq_status === 'needs_edit') add('acq_fix', { i }); if (i.acq_status === 'draft') add('acq_draft', { i }); if (i.acq_status === 'approved' && !i.agreed_at) add('acq_contact', { i }); }
+    if (i.nominated_by === id) { const ak = activeKeys(i); if (ak.length) { const miss = idMissing(i, ak); if (miss.length) add('id_fix', { i, miss }); }
+      if (i.acq_status === 'needs_edit') add('acq_fix', { i }); if (i.acq_status === 'draft') add('acq_draft', { i }); if (i.acq_status === 'approved' && !i.agreed_at) add('acq_contact', { i }); }
   }
   for (const d of S.deals) {
     if (d.closed_at) {
@@ -1014,6 +1035,7 @@ function renderMine() {
     if (k === 'members') rows = L.map(({ m }) => `<div class="qrow"><span></span><div><div class="t">${esc(m.name || m.email)}</div><div class="sub">${esc(m.email)}</div></div><div class="acts"><a class="btn sm" href="#setup">فعّله من الإعدادات</a></div></div>`).join('');
     else if (k === 'camp_quota') rows = L.map(({ c, left, leftB }) => `<div class="qrow"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">باقي ${foreign ? 'له' : 'لك'} ${esc([byCount(c) ? `${left} ترشيح` : '', byBudget(c) && leftB != null ? `${fmt(leftB)} ريال` : ''].filter(Boolean).join(' و'))}</div></div><div class="acts">${foreign ? '<span class="muted small">يرشّح من حسابه</span>' : `<button class="btn sm primary" data-nom="${c.id}" type="button">رشّح</button>`}</div></div>`).join('');
     else if (k === 'budget_alert') rows = L.map(({ c, pct: bp }) => `<div class="qrow ${bp >= 100 ? 'late' : ''}"><span></span><div><div class="t">${esc(c.name)}</div><div class="sub">المعتمد ${fmt(campSpend(c.id))} من سقف ${fmt(Number(c.budget))} ريال${bp >= 100 ? ' — الاعتمادات الجديدة مرفوضة إلا منك أو بعد رفع السقف' : ''}</div></div><div class="acts"><span class="pill ${bp >= 100 ? 'bad' : 'warn'}">${bp}٪</span><a class="btn sm" href="#camps">افتح الحملة</a></div></div>`).join('');
+    else if (k === 'id_fix') rows = L.map(({ i, miss }) => `<div class="qrow late"><span></span><div><div class="t">${esc(i.name)}${i.handle ? ' <span class="muted small" dir="ltr">@' + esc(i.handle) + '</span>' : ''}</div><div class="sub">ناقص: ${esc(miss.join('، '))}</div></div><div class="acts"><button class="btn sm primary" data-openinfl="${i.id}" type="button">كمّل البيانات</button></div></div>`).join('');
     else if (L[0].i && L[0].i.acq_status !== undefined && !L[0].d) rows = L.map(x => inflRow(x.i)).join('');
     else if (L[0].r) rows = L.map(x => reqRow(x.r)).join('');
     else if (k === 'appr') { const byB = {}; L.forEach(x => (byB[(x.d.batch_id || x.d.id)] = byB[(x.d.batch_id || x.d.id)] || []).push(x)); rows = Object.values(byB).map(g => `<div class="note"><b>${esc(camp(g[0].d.campaign_id).name)}</b> · من ${esc(memName(g[0].d.member_id))} · ${g.length} ترشيح · أُرسلت ${dShort(g[0].d.sent_at)}</div>` + g.map(x => dealRow(x, true, k)).join('')).join(''); }

@@ -56,6 +56,7 @@ let pass = 0, fail = 0; const ok = (c, n, v) => { c ? pass++ : fail++; console.l
   await c1.$eval('[data-f="price"]', e => { e.value = '500'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await c1.$$eval('input[type=checkbox]', xs => { if (xs[0]) { xs[0].checked = true; xs[0].dispatchEvent(new Event('change', { bubbles: true })); } });
   await c1.$eval('[data-f="name_en"]', e => { e.value = 'New Repl'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await c1.$eval('[data-f="phone"]', e => { e.value = '0558887777'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await p.click('#cn_draft'); await p.waitForTimeout(700);
   const wdId = await p.evaluate(() => window.__wdId);
   const got = await p.evaluate(() => window.__fake.db.deals.filter(d => d.name === 'بديل جديد').map(d => d.replaces_id));

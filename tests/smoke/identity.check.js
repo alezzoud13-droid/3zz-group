@@ -38,11 +38,10 @@ let pass = 0, fail = 0; const ok = (c, n, v) => { c ? pass++ : fail++; console.l
   await fill(el, { f: { ...base, phone: '' }, plats: ['sn'], after: { sn_user: 'brand_new_snap' } });
   const pill = await el.$eval('[data-cst]', e => e.innerText); ok(/ناقص/.test(pill) && /الجوال/.test(pill), 'بدون جوال: البطاقة «ناقص: الجوال»', pill);
   await reset(); await p.click('#cn_send'); await p.waitForTimeout(600);
-  let w = await writes(); const dr = w.find(x => x.t === 'deals' && x.op === 'insert');
-  ok(dr && !dr.p.sent_at, 'بدون جوال: انحفظ مسودة وما انرسل للاعتماد'); ok(/ناقص: الجوال/.test(await toast()), 'الرسالة تقول وش الناقص', await toast());
-  /* النافذة تنفتح من جديد بعد الحفظ: نلقى البطاقة اللي انحفظت مسودة (فيها يوزر السناب) */
-  el = await p.$('.ov [data-card] [data-f="sn_user"][value="brand_new_snap"]').then(x => x && x.evaluateHandle(e => e.closest('[data-card]')));
-  if (!el) { ok(false, 'المسودة ما ظهرت بعد الحفظ'); } else await el.$eval('[data-f="phone"]', e => { e.value = '0551112222'; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  let w = await writes();
+  ok(!w.some(x => x.t === 'influencers' && x.op === 'insert') && !w.some(x => x.t === 'deals' && x.op === 'insert'), 'بدون جوال: ما ينحفظ مؤثر جديد ولا ترشيح حتى كمسودة');
+  ok(/الجوال إلزامي/.test(await toast()), 'الرسالة: الجوال إلزامي', await toast());
+  await el.$eval('[data-f="phone"]', e => { e.value = '0551112222'; e.dispatchEvent(new Event('input', { bubbles: true })); });
   await reset(); await p.click('#cn_send'); await p.waitForTimeout(700); w = await writes();
   const up = w.find(x => x.t === 'deals' && x.p && x.p.sent_at); const inf = w.find(x => x.t === 'influencers' && x.p && (x.p.phone || x.p.snap_user));
   ok(!!up, 'سناب فقط + جوال: انرسل للاعتماد بدون رابط تيك توك'); ok(!!inf, 'ملف المؤثر انحفظ فيه الجوال/السناب', inf && JSON.stringify({ ph: inf.p.phone, sn: inf.p.snap_user }));
@@ -73,6 +72,19 @@ let pass = 0, fail = 0; const ok = (c, n, v) => { c ? pass++ : fail++; console.l
   await fill(el, { f: { ...base, name: 'روح', phone: '0541489788' }, plats: ['tt'], after: { url: rohUrl } });
   await reset(); await p.click('#cn_send'); await p.waitForTimeout(700); w = await writes();
   ok(!w.some(x => x.t === 'deals' && x.op === 'insert') && /مرشّح في هذي الحملة من قبل/.test(await toast()), 'نفس المؤثر مرتين في الحملة: ينمنع', await toast());
+
+  /* مهامي: «كمّل البيانات التعريفية» تطلع لصاحب الملف اللي ترشيحه شغّال وملفه ناقص */
+  await p.evaluate(() => { const x = document.getElementById('cn_x'); if (x) x.click(); }); await p.waitForTimeout(200);
+  await p.goto(APP_URL + 'index.html#mine'); await p.waitForTimeout(700);
+  const g = await p.$('#mineBody [data-g="id_fix"]');
+  ok(!!g, 'مهامي: مجموعة «كمّل البيانات التعريفية» ظاهرة');
+  if (g) { const sub = await g.$eval('.qrow .sub', e => e.innerText); ok(/ناقص:/.test(sub), 'كل صف يقول وش الناقص', sub);
+    await g.$eval('[data-openinfl]', e => e.click()); await p.waitForTimeout(500);
+    ok(await p.evaluate(() => /ناقص بيانات تعريفية/.test((document.querySelector('.ov') || {}).innerText || '')), 'ملف المؤثر يعرض شريط «ناقص بيانات تعريفية»');
+    ok(!!(await p.$('#i_name_en2')) || !!(await p.$('#i_name_en')), 'خانة الاسم بالإنجليزي متاحة لصاحب الملف');
+    await reset(); await p.evaluate(() => { const b = document.querySelector('.ov [data-a="save2"]'); if (b) b.click(); }); await p.waitForTimeout(400);
+    ok(/البيانات التعريفية إلزامية/.test(await toast()) || !(await p.$('.ov [data-a="save2"]')), 'حفظ الملف وهو ناقص: ينمنع ويقول وش الناقص', await toast());
+    await p.evaluate(() => { const x = document.getElementById('f_x'); if (x) x.click(); }); await p.waitForTimeout(200); }
 
   /* 6) الاستقطاب: الجوال والمنصات إلزامية، والمكرر ينمنع */
   await p.evaluate(() => { const x = document.getElementById('cn_x'); if (x) x.click(); }); await p.waitForTimeout(200);
