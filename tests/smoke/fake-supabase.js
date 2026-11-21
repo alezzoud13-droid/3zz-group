@@ -237,6 +237,16 @@
       if (!i) return null;
       return { id: i.id, name: i.name, owner_name: (DB.members.find(m => m.id === i.nominated_by) || {}).name || '', mine: i.nominated_by === uid() };
     },
+    /* مرآة public.infl_clash (التحديث 24): وش الهويات المكررة؟ الاسم وصاحب الترشيح فقط */
+    infl_clash({ p_tt, p_sn, p_ig, p_phone }) {
+      if (!isMember()) return [];
+      const un = v => { v = String(v || '').trim(); const m = v.match(/instagram\.com\/([A-Za-z0-9._]+)/i) || v.match(/snapchat\.com\/(?:add\/)?@?([A-Za-z0-9._-]+)/i) || v.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i); return (m ? m[1] : v).replace(/[\s\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/^@/, '').toLowerCase(); };
+      const p9 = v => { const d = digits(v); return d.length >= 9 ? d.slice(-9) : ''; };
+      const q = { tt: un(p_tt), sn: un(p_sn), ig: un(p_ig), ph: p9(p_phone) }, out = [];
+      for (const i of DB.influencers) { const o = { tt: un(i.handle), sn: un(i.snap_user), ig: un(i.ig_user), ph: p9(i.phone) };
+        for (const k of ['tt', 'sn', 'ig', 'ph']) if (q[k] && q[k] === o[k] && (k !== 'tt' || q[k].length > 2)) out.push({ id: i.id, name: i.name, owner_name: (DB.members.find(m => m.id === i.nominated_by) || {}).name || '', mine: i.nominated_by === uid(), field: k }); }
+      return out.slice(0, 20);
+    },
     quota_grant({ p_campaign, p_member, p_qty }) {
       if (p_qty == null || p_qty < 1) throw err('عدد الزيادة غير صحيح', 'P0001');
       if (!(isAdmin() || hasRole('approver'))) throw err('اعتماد زيادة الحصص لمتعب أو عبدالمحسن فقط', 'P0001');

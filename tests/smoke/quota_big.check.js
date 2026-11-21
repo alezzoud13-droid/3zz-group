@@ -39,7 +39,7 @@ let pass = 0, fail = 0; const ok = (c, n, x) => { c ? pass++ : fail++; console.l
   await p.click('#cn_add'); await p.waitForTimeout(200); ok(await blank() === 10, '«+ أضف» يزيد 5', String(await blank()));
   await p.click('#cn_add'); await p.waitForTimeout(200); ok(await blank() === 12 && !(await p.$('#cn_add')), 'يوقف عند الحصة (12) ويختفي الزر', String(await blank()));
   await p.fill('#cn_cards [data-card]:nth-child(12) [data-f="name"]', 'اختبار'); await p.waitForTimeout(200);
-  ok(await p.$eval('#cn_cards [data-card]:nth-child(12) [data-cst]', e => e.textContent) === 'ناقص', 'البطاقة المضافة تشتغل (تتحسب ناقصة لما تنكتب)');
+  ok(await p.$eval('#cn_cards [data-card]:nth-child(12) [data-cst]', e => e.textContent).then(t => t.startsWith('ناقص')), 'البطاقة المضافة تشتغل (تتحسب ناقصة لما تنكتب)');
   await p.click('#cn_x'); await p.waitForTimeout(200);
   await p.evaluate(id => document.querySelector(`[data-nom="${id}"]`).click(), B); await p.waitForTimeout(400);
   ok(await blank() === 5 && /بدون حد عدد/.test(await p.$eval('#cn_left', e => e.textContent)), 'بالمبلغ (1,500,000): 5 بطاقات + «بدون حد عدد»');

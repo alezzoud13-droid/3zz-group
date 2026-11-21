@@ -90,6 +90,9 @@ const handleOf = s => {
   if (/^https?:/i.test(s) || /[\/\s:?]/.test(s) || /\.(com|net|org|me|co)$/i.test(s)) return '';   // رابط مختصر أو رابط ما فيه يوزر
   return s.replace(/^@/, '').toLowerCase();
 };
+/* يوزر سناب/انستقرام/تيك توك موحّد: يقبل اليوزر أو @اليوزر أو رابط الحساب، ويشيل المسافات وعلامات الاتجاه الخفية */
+const uname = s => { s = String(s || '').trim(); const m = s.match(/instagram\.com\/([A-Za-z0-9._]+)/i) || s.match(/snapchat\.com\/(?:add\/)?@?([A-Za-z0-9._-]+)/i) || s.match(/tiktok\.com\/@([A-Za-z0-9._-]+)/i);
+  return (m ? m[1] : s).replace(/[\s\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/^@/, '').toLowerCase(); };
 /* اقتراح الاسم بالإنجليزي (نقحرة تقريبية) — الموظف يصحّحه، وهو الإلزامي */
 const AR2EN = { 'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ب': 'b', 'ت': 't', 'ث': 'th', 'ج': 'j', 'ح': 'h', 'خ': 'kh', 'د': 'd', 'ذ': 'th', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'و': 'w', 'ي': 'y', 'ى': 'a', 'ء': '', 'ئ': 'e', 'ؤ': 'o', 'ة': 'h', 'ّ': '', 'َ': 'a', 'ُ': 'u', 'ِ': 'i', 'ً': '', 'ٌ': '', 'ٍ': '', 'ْ': '', 'ـ': '' };
 const translit = s => String(s || '').replace(/[؀-ۿ]/g, c => AR2EN[c] ?? '').replace(/[^A-Za-z0-9\s.-]/g, ' ').replace(/\s+/g, ' ').trim().replace(/(^|\s)[a-z]/g, c => c.toUpperCase());
@@ -369,6 +372,22 @@ function dupInfl(handle, url, phone, exceptId) {
   const h = handleOf(handle || url), p = ph9(phone);
   return S.infl.filter(x => x.id !== exceptId && ((h && h.length > 2 && handleOf(x.handle || x.tiktok_url) === h) || (p && ph9(x.phone) === p)));
 }
+/* التكرار (21 نوفمبر): أي مؤثر يتعرّف بأربع هويات — يوزر تيك توك، يوزر سناب، يوزر انستقرام، الجوال.
+   لو أي وحدة منها مسجّلة لملف ثاني، الإدخال ينمنع (ولا يندمج تلقائياً زي ما صار مع محال وروح). */
+const IDF = { tt: 'يوزر تيك توك', sn: 'يوزر سناب', ig: 'يوزر انستقرام', ph: 'رقم الجوال' };
+const idsOf = o => ({ tt: handleOf(o.handle || o.tiktok_url || ''), sn: uname(o.snap_user), ig: uname(o.ig_user), ph: ph9(o.phone) });
+const idHit = (k, a, b) => !!a && a === b && (k !== 'tt' || a.length > 2);
+/* تعارض بين بيانات البطاقة وملف المؤثر المربوط: نفس النوع وقيمتين مختلفتين */
+const idConflict = (file, ids) => { if (!file) return ''; const o = idsOf(file); return Object.keys(IDF).find(k => ids[k] && o[k] && ids[k] !== o[k]) || ''; };
+async function idClashes(ids, exceptId) {
+  const out = []; const add = c => { if (c.id !== exceptId && !out.some(x => x.id === c.id && x.field === c.field)) out.push(c); };
+  for (const x of S.infl) { const o = idsOf(x); for (const k of Object.keys(IDF)) if (idHit(k, ids[k], o[k])) add({ id: x.id, name: x.name, owner_name: memName(x.nominated_by), mine: x.nominated_by === S.me.id, field: k }); }
+  if (!seesAll() && (ids.tt || ids.sn || ids.ig || ids.ph)) {
+    try { const { data, error } = await sb.rpc('infl_clash', { p_tt: ids.tt || '', p_sn: ids.sn || '', p_ig: ids.ig || '', p_phone: ids.ph || '' }); if (!error && Array.isArray(data)) data.forEach(add); } catch (e) { }
+  }
+  return out;
+}
+const clashMsg = c => `${IDF[c.field]} مسجّل للمؤثر «${c.name}»${c.owner_name ? ' عند ' + c.owner_name : ''}`;
 /* الحساب عند زميل؟ الموظف ما يشوف ملفات غيره، فنسأل قاعدة البيانات: ترجع الاسم وصاحب الترشيح فقط */
 const seesAll = () => isAdmin() || isApprover();
 async function takenBy(handle, phone) {
@@ -390,28 +409,39 @@ function openAcqNew() {
    <div class="field"><label>المرشِّح</label><input type="text" value="${esc(S.me.name)}" disabled></div>
    <div class="field"><label for="q_status">حالة الحساب</label><select id="q_status"><option>استقطاب</option><option>مستمر</option></select></div>
    <div class="field"><label for="q_type">نوع الحساب *</label><select id="q_type">${optsBlank(ACC_TYPES)}</select></div>
-   <div class="field"><label for="q_name">اسم المعلن *</label><input type="text" id="q_name"></div>
+   <div class="field"><label for="q_name">اسم المعلن (عربي) *</label><input type="text" id="q_name"></div>
    <div class="field"><label for="q_name_en">الاسم بالإنجليزي *</label><input type="text" id="q_name_en" dir="ltr" placeholder="يتعبى تلقائياً وتصحّحه"></div>
-   <div class="field"><label for="q_url">رابط حساب تيك توك *</label><input type="url" id="q_url" dir="ltr" placeholder="https://www.tiktok.com/@..."></div>
-   <div class="field"><label for="q_handle">يوزر تيك توك (بدون @)</label><input type="text" id="q_handle" dir="ltr"></div>
+   <div class="field"><label for="q_phone">رقم الجوال *</label><input type="tel" id="q_phone" dir="ltr" placeholder="05xxxxxxxx"></div>
+  </div>
+  <div class="field"><label>المنصات *</label>${platChecks('q', ['tt'])}<div class="muted small">كل منصة تختارها، يوزرها إلزامي. وأي يوزر أو جوال مسجّل لمؤثر ثاني، التسجيل ما ينحفظ.</div></div>
+  <div class="grid2">
+   <div class="field" data-for="tt"><label for="q_url">رابط حساب تيك توك *</label><input type="url" id="q_url" dir="ltr" placeholder="https://www.tiktok.com/@..."></div>
+   <div class="field" data-for="tt"><label for="q_handle">يوزر تيك توك (بدون @)</label><input type="text" id="q_handle" dir="ltr"></div>
+   <div class="field" data-for="sn" hidden><label for="q_sn">يوزر سناب شات *</label><input type="text" id="q_sn" dir="ltr"></div>
+   <div class="field" data-for="ig" hidden><label for="q_ig">يوزر انستقرام *</label><input type="text" id="q_ig" dir="ltr"></div>
   </div>
   <div id="q_dup"></div>
   <div class="row"><button class="btn primary" id="q_send" type="button">إرسال الترشيح للمراجعة</button><button class="btn" id="q_draft" type="button">حفظ كمسودة</button><button class="btn" id="q_x" type="button">إلغاء</button></div>`, root => {
     const chk = () => { if (!$('q_handle').value && $('q_url').value) $('q_handle').value = handleOf($('q_url').value); const d = dupInfl($('q_handle').value, $('q_url').value); $('q_dup').innerHTML = d.length ? inflHistory(d[0]) : ''; if (d.length && isContinuing(d[0])) $('q_status').value = 'مستمر'; if (!d.length) takenBy(handleOf($('q_handle').value || $('q_url').value)).then(t => { if (t && $('q_dup')) $('q_dup').innerHTML = `<div class="dup">${esc(takenMsg(t))}</div>`; }); };
     $('q_url').addEventListener('change', chk); $('q_handle').addEventListener('change', chk);
+    root.addEventListener('change', e => { if (e.target.closest('[data-plat="q"]')) { const k = readPlats(root, 'q'); root.querySelectorAll('[data-for]').forEach(x => x.hidden = !k.includes(x.dataset.for)); } });
     $('q_name').addEventListener('change', () => { if (!$('q_name_en').value.trim()) $('q_name_en').value = translit($('q_name').value); });
     $('q_x').onclick = closeModal;
     const save = async send => {
-      const name = $('q_name').value.trim(), url = $('q_url').value.trim(), handle = handleOf($('q_handle').value || url), type = $('q_type').value;
-      const name_en = $('q_name_en').value.trim() || translit(name);
-      if (!name || !url || !type) return toast('عبّ الاسم ونوع الحساب ورابط تيك توك', true);
-      if (!name_en) return toast('اكتب اسم المعلن بالإنجليزي — يُستخدم في تسمية المقاطع وشيت التشغيل', true);
-      if (!isUrl(url)) return toast('رابط الحساب مو صحيح', true);
-      if (!handle) return toast('اكتب يوزر الحساب في خانة «يوزر تيك توك». الرابط المختصر ما ينقرأ منه اليوزر، واليوزر هو اللي نعرف به الحساب', true);
-      const dup = dupInfl(handle, url); if (dup.length && !await confirmBox('الحساب هذا موجود عندنا. تبي تسجّله مرة ثانية؟ الأفضل تفتح ملفه الموجود.')) return;
-      if (!dup.length) { const t = await takenBy(handle); if (t) return toast(takenMsg(t), true); }
+      const keys = readPlats(root, 'q'), tt = keys.includes('tt');
+      const name = $('q_name').value.trim(), url = tt ? $('q_url').value.trim() : '', handle = tt ? handleOf($('q_handle').value || url) : '', type = $('q_type').value;
+      const name_en = $('q_name_en').value.trim() || translit(name), rawPhone = $('q_phone').value.trim(), phone = normPhone(rawPhone);
+      const sn = keys.includes('sn') ? $('q_sn').value.trim() : '', ig = keys.includes('ig') ? $('q_ig').value.trim() : '';
+      const miss = []; if (!name) miss.push('الاسم'); if (!name_en) miss.push('الاسم بالإنجليزي'); if (!rawPhone) miss.push('الجوال'); if (!type) miss.push('نوع الحساب'); if (!keys.length) miss.push('المنصات');
+      if (tt && !url) miss.push('رابط تيك توك'); if (keys.includes('sn') && !sn) miss.push('يوزر سناب'); if (keys.includes('ig') && !ig) miss.push('يوزر انستقرام');
+      if (miss.length) return toast('ناقص: ' + miss.join('، '), true);
+      if (phone === null) return toast('رقم الجوال مو صحيح (السعودي يبدأ بـ 05، والدولي بـ + ومفتاح الدولة)', true);
+      if (tt && !isUrl(url)) return toast('رابط تيك توك مو صحيح', true);
+      if (tt && !handle) return toast('اكتب يوزر الحساب في خانة «يوزر تيك توك». الرابط المختصر ما ينقرأ منه اليوزر، واليوزر هو اللي نعرف به الحساب', true);
+      const cl = await idClashes({ tt: handle, sn: uname(sn), ig: uname(ig), ph: ph9(phone) });
+      if (cl.length) return toast(`${clashMsg(cl[0])} — ما ينفع ينسجّل مرتين. إذا هو نفس المؤثر افتح ملفه الموجود.`, true);
       root.querySelectorAll('button').forEach(b => b.disabled = true);
-      const r = await saveInfl(null, { name, name_en, tiktok_url: url, handle, acc_type: type, account_status: $('q_status').value, nominated_on: $('q_date').value || today(), nominated_by: S.me.id, source: 'acq', acq_status: send ? 'pending' : 'draft', acq_sent_at: send ? nowIso() : null });
+      const r = await saveInfl(null, { name, name_en, tiktok_url: url, handle, phone, snap_user: sn, ig_user: ig, platforms: platText(keys), acc_type: type, account_status: $('q_status').value, nominated_on: $('q_date').value || today(), nominated_by: S.me.id, source: 'acq', acq_status: send ? 'pending' : 'draft', acq_sent_at: send ? nowIso() : null });
       root.querySelectorAll('button').forEach(b => b.disabled = false);
       if (r) { toast(send ? 'انرسل للمراجعة عند ' + apprFor(S.me.id) : 'انحفظ كمسودة'); openInfl(r.id); }
     };
@@ -616,28 +646,28 @@ function nomCard(n, d, pre) {
   return `<div class="card" data-card="${n}" data-deal="${d ? d.id : ''}" data-infl="${i ? i.id : ''}">
    <div class="hd"><b>الترشيح ${n}</b><span class="pill" data-cst></span>${d && d.approval === 'needs_edit' ? `<span class="pill warn">يحتاج تعديل: ${esc(d.decision_reason)}</span>` : ''}${i ? `<span class="pill acc">${esc(i.name)} موجود عندنا</span>` : ''}</div>
    <div class="grid2">
-    <div class="field"><label>رابط حساب تيك توك *</label><input type="url" data-f="url" dir="ltr" value="${val('_url', 'tiktok_url')}" placeholder="https://www.tiktok.com/@..."></div>
-    <div class="field"><label>اسم المعلن *</label><input type="text" data-f="name" value="${val('name')}"></div>
+    <div class="field"><label>اسم المعلن (عربي) *</label><input type="text" data-f="name" value="${val('name')}"></div>
+    <div class="field"><label>الاسم بالإنجليزي *</label><input type="text" data-f="name_en" dir="ltr" value="${esc(i ? i.name_en : '')}" placeholder="يتعبى تلقائياً وتصحّحه"></div>
+    <div class="field"><label>رقم الجوال *</label><input type="tel" data-f="phone" dir="ltr" value="${val('rcv_phone', 'phone')}" placeholder="05xxxxxxxx"></div>
     <div class="field"><label>نوع المحتوى *</label><select data-f="acc_type">${optsBlank(ACC_TYPES, src.acc_type || (i && i.acc_type))}</select></div>
     <div class="field"><label>السعر قبل التفاوض *</label><input type="number" min="0" data-f="price_before" value="${val('price_before')}" placeholder="السعر اللي طلبه أول"></div>
     <div class="field"><label>المبلغ بعد التفاوض *</label><input type="number" min="0" data-f="price" value="${val('price', 'price_after')}" placeholder="0 = مقابل منتج"></div>
     <div class="field"><label>نوع الإعلان</label><select data-f="ad_type">${optsBlank(AD_TYPES, adT(src.ad_type))}</select></div>
     <div class="field"><label>حالة الحساب</label><select data-f="status">${opts(['استقطاب', 'مستمر'], isContinuing(i) ? 'مستمر' : (i && i.account_status) || 'استقطاب')}</select></div>
    </div>
-   <div class="field"><label>منصة التنزيل *</label>${platChecks('c' + n, keys)}</div>
+   <div class="field"><label>منصة التنزيل *</label>${platChecks('c' + n, keys)}<div class="muted small">كل منصة تختارها، يوزرها إلزامي. وأي يوزر أو جوال مسجّل لمؤثر ثاني، الترشيح ما ينحفظ.</div></div>
    <div class="grid2">
-    <div class="field" data-for="sn" ${keys.includes('sn') ? '' : 'hidden'}><label>يوزر سناب شات</label><input type="text" data-f="sn_user" dir="ltr" value="${val('sn_user', 'snap_user')}"></div>
-    <div class="field" data-for="ig" ${keys.includes('ig') ? '' : 'hidden'}><label>رابط أو يوزر انستقرام</label><input type="text" data-f="ig_user" dir="ltr" value="${esc(i ? i.ig_user : '')}"></div>
+    <div class="field" data-for="tt" ${keys.includes('tt') ? '' : 'hidden'}><label>رابط حساب تيك توك *</label><input type="url" data-f="url" dir="ltr" value="${val('_url', 'tiktok_url')}" placeholder="https://www.tiktok.com/@..."></div>
+    <div class="field" data-for="sn" ${keys.includes('sn') ? '' : 'hidden'}><label>يوزر سناب شات *</label><input type="text" data-f="sn_user" dir="ltr" value="${val('sn_user', 'snap_user')}"></div>
+    <div class="field" data-for="ig" ${keys.includes('ig') ? '' : 'hidden'}><label>يوزر انستقرام *</label><input type="text" data-f="ig_user" dir="ltr" value="${esc(i ? i.ig_user : '')}"></div>
    </div>
-   <details><summary class="small" style="cursor:pointer;color:var(--accent)">بيانات إضافية (العنوان، الاسم بالإنجليزي، تاريخ النشر، الهوك)</summary><div class="grid2" style="margin-top:10px">
-    <div class="field"><label>الاسم بالإنجليزي *</label><input type="text" data-f="name_en" dir="ltr" value="${esc(i ? i.name_en : '')}" placeholder="يتعبى تلقائياً وتصحّحه"></div>
-    <div class="field"><label>رقم الجوال</label><input type="tel" data-f="phone" dir="ltr" value="${val('rcv_phone', 'phone')}"></div>
+   <details><summary class="small" style="cursor:pointer;color:var(--accent)">بيانات إضافية (العنوان، تاريخ النشر، الهوك)</summary><div class="grid2" style="margin-top:10px">
     <div class="field"><label>الدولة</label><input type="text" data-f="country" list="dlCountries" value="${val('country')}"></div>
     <div class="field"><label>المدينة</label><input type="text" data-f="city" list="dlCities" value="${val('rcv_city', 'city')}"></div>
     <div class="field"><label>الحي مع الرمز المختصر</label><input type="text" data-f="district" value="${val('address', 'district')}"></div>
     <div class="field"><label>تاريخ النشر المتوقع</label><input type="date" data-f="planned_date" value="${esc(src.planned_date || '')}"></div>
     <div class="field"><label>هوك الفيديو</label><input type="text" data-f="hook" value="${esc(src.hook || '')}"></div>
-   </div><div class="muted small">إذا عبّيت الجوال والمدينة والحي، يروح لصقر للشحن مباشرة بعد الاعتماد. وإذا تركتها، ترسل للمؤثر رابط يعبّيها بنفسه.</div></details>
+   </div><div class="muted small">إذا عبّيت المدينة والحي، يروح لصقر للشحن مباشرة بعد الاعتماد. وإذا تركتها، ترسل للمؤثر رابط يعبّيها بنفسه.</div></details>
    ${d ? '<div><button class="btn sm danger" data-rm type="button">حذف هذا الترشيح</button></div>' : ''}
   </div>`;
 }
@@ -674,11 +704,18 @@ function openCampNom(cid, preInfl) {
     $('cn_x').onclick = closeModal;
     const cardEls = () => [...root.querySelectorAll('[data-card]')];
     const f = (el, k) => { const x = el.querySelector(`[data-f="${k}"]`); return x ? x.value.trim() : ''; };
-    const isEmpty = el => !f(el, 'url') && !f(el, 'name');
-    const isDone = el => f(el, 'url') && f(el, 'name') && f(el, 'acc_type') && f(el, 'price') !== '' && f(el, 'price_before') !== '' && readPlats(el, 'c' + el.dataset.card).length;
+    const isEmpty = el => !f(el, 'url') && !f(el, 'name') && !f(el, 'sn_user') && !f(el, 'ig_user') && !f(el, 'phone');
+    /* الإلزامي (21 نوفمبر): الاسم عربي وإنجليزي، الجوال، النوع، السعرين، المنصة — ويوزر كل منصة مختارة */
+    const missing = el => { const k = readPlats(el, 'c' + el.dataset.card), m = [];
+      if (!f(el, 'name')) m.push('الاسم'); if (!f(el, 'name_en')) m.push('الاسم بالإنجليزي'); if (!f(el, 'phone')) m.push('الجوال');
+      if (!f(el, 'acc_type')) m.push('نوع المحتوى'); if (f(el, 'price_before') === '') m.push('السعر قبل'); if (f(el, 'price') === '') m.push('المبلغ بعد');
+      if (!k.length) m.push('منصة التنزيل');
+      if (k.includes('tt') && !f(el, 'url')) m.push('رابط تيك توك'); if (k.includes('sn') && !f(el, 'sn_user')) m.push('يوزر سناب'); if (k.includes('ig') && !f(el, 'ig_user')) m.push('يوزر انستقرام');
+      return m; };
+    const isDone = el => !missing(el).length;
     const bindName = inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const en = el.querySelector('[data-f=name_en]'); if (en && !en.value.trim()) en.value = translit(inp.value); });
     root.querySelectorAll('[data-f=name]').forEach(bindName);
-    const count = () => { let ok = 0; cardEls().forEach(el => { const d = isDone(el); el.classList.toggle('ok', !!d); el.classList.toggle('part', !d && !isEmpty(el)); el.querySelector('[data-cst]').textContent = d ? 'مكتمل' : isEmpty(el) ? 'فاضي' : 'ناقص'; if (d) ok++; }); $('cn_count').textContent = `مكتمل ${ok} من ${cardEls().length}`; };
+    const count = () => { let ok = 0; cardEls().forEach(el => { const d = isDone(el); el.classList.toggle('ok', !!d); el.classList.toggle('part', !d && !isEmpty(el)); el.querySelector('[data-cst]').textContent = d ? 'مكتمل' : isEmpty(el) ? 'فاضي' : 'ناقص: ' + missing(el).join('، '); if (d) ok++; }); $('cn_count').textContent = `مكتمل ${ok} من ${cardEls().length}`; };
     root.addEventListener('input', count); root.addEventListener('change', e => { const p = e.target.closest('[data-plat]'); if (p) { const el = p.closest('[data-card]'); const k = readPlats(el, 'c' + el.dataset.card); el.querySelectorAll('[data-for]').forEach(x => x.hidden = !k.includes(x.dataset.for)); } count(); });
     const bindUrl = inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const dup = dupInfl(handleOf(inp.value), inp.value); if (dup.length && !el.dataset.infl) { const i = dup[0]; el.dataset.infl = i.id; const set = (k, v) => { const x = el.querySelector(`[data-f="${k}"]`); if (x && !x.value && v) x.value = v; }; set('name', i.name); set('acc_type', i.acc_type); set('phone', i.phone); set('city', i.city); set('district', i.district); set('country', i.country); set('sn_user', i.snap_user); set('ig_user', i.ig_user); set('name_en', i.name_en); if (i.price_after != null) set('price', String(i.price_after)); if (i.price_before != null) set('price_before', String(i.price_before)); if (isContinuing(i)) el.querySelector('[data-f=status]').value = 'مستمر'; toast('الحساب موجود عندنا، سحبت بياناته'); count(); } else if (!dup.length) takenBy(handleOf(inp.value)).then(t => { let w = el.querySelector('[data-taken]'); if (!w) { w = document.createElement('div'); w.dataset.taken = '1'; w.className = 'dup'; el.querySelector('.hd').after(w); } w.hidden = !t; w.textContent = t ? takenMsg(t) : ''; }); });
     root.querySelectorAll('[data-f=url]').forEach(bindUrl);
@@ -700,12 +737,20 @@ function openCampNom(cid, preInfl) {
         if (isEmpty(el)) continue; const done = isDone(el);
         const keys = readPlats(el, 'c' + el.dataset.card); const rawPhone = f(el, 'phone'); const phone = normPhone(rawPhone);
         if (rawPhone && phone === null) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: رقم الجوال مو صحيح (السعودي يبدأ بـ 05، والدولي بـ + ومفتاح الدولة)`); continue; }
-        const url = f(el, 'url'); if (!isUrl(url)) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: رابط الحساب مو صحيح (لازم يبدأ بـ https)`); continue; }
-        if (shortLink(url)) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: الرابط المختصر ما ينقرأ منه اليوزر. افتح الحساب وانسخ رابطه الكامل (tiktok.com/@اليوزر)`); continue; }
+        const url = f(el, 'url'); if ((url || keys.includes('tt')) && !isUrl(url)) { if (!send && !url) { } else { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: رابط تيك توك مو صحيح (لازم يبدأ بـ https)`); continue; } }
+        if (url && shortLink(url)) { bad++; el.classList.add('part'); why.push(`الترشيح ${el.dataset.card}: الرابط المختصر ما ينقرأ منه اليوزر. افتح الحساب وانسخ رابطه الكامل (tiktok.com/@اليوزر)`); continue; }
         // ملف المؤثر: نستخدم الموجود أو ننشئ جديد
-        let iid = el.dataset.infl; const handle = handleOf(url);
-        if (!iid) { const dup = dupInfl(handle, url, phone); if (dup.length) iid = dup[0].id; }
-        if (!iid) { const t = await takenBy(handle, phone); if (t) { taken.push(takenMsg(t)); el.classList.add('part'); continue; } }
+        let iid = el.dataset.infl || ''; const handle = url ? handleOf(url) : '';
+        const ids = { tt: handle, sn: uname(f(el, 'sn_user')), ig: uname(f(el, 'ig_user')), ph: ph9(phone) };
+        const cl = await idClashes(ids, iid);
+        if (cl.length) {
+          /* نفس المؤثر يرجع لحملة جديدة: كل التطابقات على ملف واحد حقّي (أو أنا عبدالمحسن)، وما فيه أي يوزر يخالف الملف → نربطه بملفه */
+          const fids = [...new Set(cl.map(x => x.id))], file = fids.length === 1 && !iid ? infl(fids[0]) : null;
+          if (file && file.id && (file.nominated_by === me || isAdmin()) && !idConflict(file, ids)) iid = file.id;
+          else { taken.push(`الترشيح ${el.dataset.card}: ${clashMsg(cl[0])} — ما ينفع ينسجّل مرتين. إذا هو نفس المؤثر، رشّحه من ملفه في «الاستقطاب».`); el.classList.add('part'); continue; }
+        }
+        if (iid) { const fx = infl(iid), bad1 = idConflict(fx, ids); if (bad1) { taken.push(`الترشيح ${el.dataset.card}: ${IDF[bad1]} اللي كتبته ما يطابق ملف «${fx.name}». إذا هذا مؤثر ثاني، افتح بطاقة جديدة له.`); el.classList.add('part'); continue; }
+          if (S.deals.some(x => x.influencer_id === iid && x.campaign_id === cid && x.id !== el.dataset.deal && !isClosed(x))) { taken.push(`الترشيح ${el.dataset.card}: «${fx ? fx.name : ''}» مرشّح في هذي الحملة من قبل.`); el.classList.add('part'); continue; } }
         const inflData = { name: f(el, 'name'), name_en: f(el, 'name_en') || translit(f(el, 'name')), tiktok_url: url, handle, acc_type: f(el, 'acc_type'), phone: phone || '', country: f(el, 'country'), city: f(el, 'city'), district: f(el, 'district'), snap_user: f(el, 'sn_user'), ig_user: f(el, 'ig_user'), platforms: platText(keys), account_status: f(el, 'status') };
         if (iid) { const cur = infl(iid); const fillEmpty = {}; for (const k in inflData) if (inflData[k] && !cur[k]) fillEmpty[k] = inflData[k]; if (Object.keys(fillEmpty).length) await saveInfl(iid, fillEmpty); }
         else { const r = await saveInfl(null, { ...inflData, nominated_by: me, source: 'campaign', acq_status: 'none' }); if (!r) { bad++; continue; } iid = r.id; el.dataset.infl = iid; }
@@ -714,13 +759,14 @@ function openCampNom(cid, preInfl) {
         Object.keys(dealData).forEach(k => dealData[k] === undefined && delete dealData[k]);
         /* أي ترشيح جديد في حملة عند صاحبه انسحاب بدون بديل ينربط تلقائياً بأقدم انسحاب (أو اللي اختاره من «رشّح بديل») */
         if (!el.dataset.deal) { const tgt = S.replFor && S.replFor.cid === cid && !S.deals.some(x => x.replaces_id === S.replFor.id) ? S.replFor.id : (unreplaced(cid, me)[0] || {}).id; if (tgt) dealData.replaces_id = tgt; }
+        if (send && !done) why.push(`الترشيح ${el.dataset.card} انحفظ مسودة — ناقص: ${missing(el).join('، ')}`);
         if (send && done) Object.assign(dealData, { sent_at: nowIso(), batch_id: batch, approval: 'pending', decision_reason: '' });
         const r = await saveDeal(el.dataset.deal || null, dealData); if (!r) { bad++; continue; } el.dataset.deal = r.id; saved++; if (send && done) sent++;
       }
       busy = false; root.querySelectorAll('#cn_draft,#cn_send').forEach(b => b.disabled = false);
       if (taken.length) toast(taken.join(' '), true);
       else if (bad) toast(why.length ? why.join(' · ') : `${bad} ترشيح ما انحفظ. حدّث الصفحة وجرّب مرة ثانية`, true);
-      else toast(send ? `انرسل ${sent} ترشيح للاعتماد عند ${apprFor(S.me.id)}${saved > sent ? '، و' + (saved - sent) + ' انحفظت مسودة لأنها ناقصة' : ''}` : `انحفظ ${saved} كمسودة`);
+      else toast(send ? `انرسل ${sent} ترشيح للاعتماد عند ${apprFor(S.me.id)}${saved > sent ? '، و' + (saved - sent) + ' انحفظت مسودة لأنها ناقصة' : ''}${why.length ? ' · ' + why.join(' · ') : ''}` : `انحفظ ${saved} كمسودة`, send && saved > sent);
       if (!bad && !taken.length) { if (send && sent) closeModal(); else openCampNom(cid); }
     };
     if ($('cn_draft')) { $('cn_draft').onclick = () => saveAll(false); $('cn_send').onclick = () => saveAll(true); }

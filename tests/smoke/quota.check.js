@@ -71,7 +71,8 @@ let pass = 0, fail = 0; const ok = (c, n, x) => { c ? pass++ : fail++; console.l
   ok(/حدك في الصرف/.test(head) && /4,000/.test(head), 'نموذج الترشيح يعرض الحد والصرف والباقي');
   const fill = async (n, price) => {
     const c = '#cn_cards [data-card="' + n + '"]';
-    await p.fill(c + ' [data-f="url"]', 'https://www.tiktok.com/@qb_test_' + n);
+    await p.check(c + ' input[data-plat][value="tt"]'); await p.fill(c + ' [data-f="url"]', 'https://www.tiktok.com/@qb_test_' + n);
+    await p.fill(c + ' [data-f="phone"]', '05500000' + String(n).padStart(2, '0')); await p.fill(c + ' [data-f="name_en"]', 'Mu ' + n);
     await p.fill(c + ' [data-f="name"]', 'مؤثر ' + n);
     await p.selectOption(c + ' [data-f="acc_type"]', { index: 1 });
     await p.fill(c + ' [data-f="price"]', String(price));
