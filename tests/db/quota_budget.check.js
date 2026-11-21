@@ -43,16 +43,29 @@ const res = []; const blocked = (n, r) => { const v = r.ok && r.n > 0; res.push(
   blocked('خالد يتجاوز حده (9000 > 6000)', await nom('kh', 9000));
   allowed('عبدالمحسن يتجاوز حد الموظف عند الحاجة', await as('admin', "insert into deals(name,member_id,campaign_id,price,price_before,platform,acc_type,sent_at) values('استثناء',$1,$2,9000,9000,'تيك توك','بيعي',now()) returning id", [U.kh, camp]));
 
-  // 5) اعتماد طلب الزيادة بالعدد و/أو المبلغ
+  // 5) اعتماد طلب الزيادة بالعدد و/أو المبلغ — بطلب مفتوح فقط (قرار 22)، ورفع سقف الحملة لعبدالمحسن (قرار 24)
   const before = (await su('select target_total,budget from campaigns where id=$1', [camp]))[0];
-  const g = await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.reem, 1, 2000]);
-  allowed('المعتمد يزيد حصة ريم عدداً ومبلغاً', g);
+  blocked('المعتمد يزيد حصة ريم بدون أي طلب منها', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.reem, 1, 2000]));
+  const rq = await as('reem', "insert into requests(kind,title,from_member,to_member,campaign_id,qty,qty_budget) values('quota','زيادة',$1,$2,$3,1,2000) returning id", [U.reem, U.mitab, camp]);
+  allowed('ريم تطلب زيادة ترشيح و2000 ريال', rq);
+  blocked('ريم تعدّل مبلغ طلبها بعد الإرسال', await as('reem', 'update requests set qty_budget=9000 where id=$1 returning id', [rq.rows[0].id]));
+  blocked('المعتمد يعتمد مبلغ أعلى من المطلوب', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.reem, 1, 9000]));
+  blocked('المعتمد يعتمد زيادة مبلغ تتجاوز سقف الحملة (رفع السقف لعبدالمحسن)', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.reem, 1, 2000]));
+  const g = await as('admin', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.reem, 1, 2000]);
+  allowed('عبدالمحسن يعتمد الزيادة ويرفع سقف الحملة', g);
   const after = (await su('select target_total,budget from campaigns where id=$1', [camp]))[0];
   const q = (await su('select quota,quota_budget from quotas where campaign_id=$1 and member_id=$2', [camp, U.reem]))[0];
-  res.push([(+q.quota === 4 && +q.quota_budget === 6000 && +after.target_total === +before.target_total + 1 && +after.budget === +before.budget + 2000) ? 'ok  ' : 'BROKEN', 'الزيادة ترفع حصة الموظف وسقف الحملة معاً', `حصة ${q.quota}/${q.quota_budget} · حملة ${after.target_total}/${after.budget}`]);
+  const st = (await su('select status from requests where id=$1', [rq.rows[0].id]))[0].status;
+  res.push([(+q.quota === 4 && +q.quota_budget === 6000 && +after.target_total === +before.target_total + 1 && +after.budget === +before.budget + 2000 && st === 'done') ? 'ok  ' : 'BROKEN', 'الزيادة ترفع حصة الموظف وسقف الحملة وتقفل الطلب', `حصة ${q.quota}/${q.quota_budget} سقف ${after.budget} طلب ${st}`]);
+  const rk = await as('kh', "insert into requests(kind,title,from_member,to_member,campaign_id,qty) values('quota','زيادة',$1,$2,$3,2) returning id", [U.kh, U.mitab, camp]);
+  allowed('المعتمد يعتمد طلب زيادة عدد مفتوح', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.kh, 2, 0]));
+  blocked('نفس الطلب يتعتمد مرتين', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.kh, 2, 0]));
   blocked('المعتمد يزيد حصة نفسه', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.mitab, 1, 100]));
   blocked('صانع محتوى يزيد حصته بنفسه', await as('reem', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.reem, 1, 100]));
   blocked('زيادة بصفر عدد وصفر مبلغ', await as('mitab', 'select public.quota_grant_b($1,$2,$3,$4) as r', [camp, U.kh, 0, 0]));
+  // 6) أعداد ومبالغ كبيرة
+  const big = (await su("insert into campaigns(name,product,target_total,budget,quota_mode) values('حملة كبيرة','منتج',5000,5000000,'both') returning id"))[0].id;
+  allowed('توزيع كبير: 1500 ترشيح و1,500,000 ريال لموظف', await as('mitab', 'insert into quotas(campaign_id,member_id,quota,quota_budget) values($1,$2,1500,1500000) returning member_id', [big, U.reem]));
   allowed('بعد الزيادة: ريم ترشّح بالمبلغ الجديد', await nom('reem', 1500));
 
   for (const r of res) console.log(r.join(' | '));

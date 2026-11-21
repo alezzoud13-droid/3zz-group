@@ -645,15 +645,20 @@ function openCampNom(cid, preInfl) {
   const fixes = st.fix, drafts = st.drafts, sentN = st.sent.filter(d => !d.closed_at && !['rejected', 'needs_edit'].includes(d.approval)).length;
   const mode = qMode(c), qb = quotaBudgetOf(cid, me), leftB = budgetLeft(cid, me), spentB = memberSpend(cid, me);
   const noQuota = mode === 'budget' ? !qb : !quota;                 /* بالمبلغ: الحد هو الريال مو العدد */
-  const free = mode === 'budget' ? (leftB > 0 ? 5 : 0) : Math.max(0, quota - st.used);
+  /* بطاقات فاضية: أول 5 تظهر، والباقي بزر «+ أضف بطاقات» — عشان الحصص الكبيرة (مئات) ما تثقّل النافذة.
+     بالمبلغ: ما فيه حد عدد، الحد هو الريال ويتفحص عند الإرسال */
+  const free = mode === 'budget' ? (leftB > 0 ? Infinity : 0) : Math.max(0, quota - st.used);
+  const firstBlank = Math.min(free, 5);
   let n = 0; const cards = [];
   fixes.forEach(d => cards.push(nomCard(++n, d))); drafts.forEach(d => cards.push(nomCard(++n, d)));
-  for (let k = 0; k < free; k++) cards.push(nomCard(++n, null, k === 0 ? preInfl : null));
+  for (let k = 0; k < firstBlank; k++) cards.push(nomCard(++n, null, k === 0 ? preInfl : null));
+  let shownBlank = firstBlank;
   modal(`<div class="row between"><div><h2>ترشيح لحملة «${esc(c.name)}»</h2><div class="muted small">حصتك ${esc(myQuotaLine(cid, me, c))} · أرسلت ${sentN}${fixes.length ? ' · ' + fixes.length + ' ترجع للتعديل' : ''}</div></div><button class="btn" id="cn_x" type="button">إغلاق</button></div>
    ${noQuota ? `<div class="dup">ما عندك حصة في هذي الحملة${isAdmin() ? ' — حدد لنفسك حصة من جدول الحصص في تبويب «الحملات»' : `. اطلب من ${esc(apprFor(S.me.id))} يحدد لك عدد، أو استخدم «طلب ترشيحات إضافية»`}.</div>` : ''}
    ${byBudget(c) && qb ? `<div class="note">حدك في الصرف ${fmt(qb)} ريال: صرفت ${fmt(spentB)} وباقي لك ${fmt(leftB)}. مجموع مبالغ اللي ترسله ما يتجاوز الباقي.</div>` : ''}
    ${!cards.length && !noQuota ? `<div class="note">خلّصت حصتك في هذي الحملة. إذا تبي ترشّح أكثر، اطلب زيادة من ${esc(apprFor(S.me.id))}.</div>` : ''}
    <div id="cn_cards" style="display:grid;gap:12px">${cards.join('')}</div>
+   ${free > firstBlank ? `<div class="row"><button class="btn" id="cn_add" type="button">+ أضف بطاقات ترشيح</button><span class="muted small" id="cn_left">${free === Infinity ? 'بدون حد عدد — الحد مبلغ الصرف' : `باقي ${free - firstBlank} بطاقة في حصتك`}</span></div>` : ''}
    <div class="panel" style="position:sticky;bottom:0"><div class="row between"><b id="cn_count"></b>
     <div class="row"><button class="btn" id="cn_more" type="button">طلب ترشيحات إضافية</button>${cards.length ? '<button class="btn" id="cn_draft" type="button">حفظ كمسودة</button><button class="btn primary" id="cn_send" type="button">إرسال الترشيحات للاعتماد</button>' : ''}</div></div></div>`, root => {
     $('cn_x').onclick = closeModal;
@@ -661,10 +666,15 @@ function openCampNom(cid, preInfl) {
     const f = (el, k) => { const x = el.querySelector(`[data-f="${k}"]`); return x ? x.value.trim() : ''; };
     const isEmpty = el => !f(el, 'url') && !f(el, 'name');
     const isDone = el => f(el, 'url') && f(el, 'name') && f(el, 'acc_type') && f(el, 'price') !== '' && f(el, 'price_before') !== '' && readPlats(el, 'c' + el.dataset.card).length;
-    root.querySelectorAll('[data-f=name]').forEach(inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const en = el.querySelector('[data-f=name_en]'); if (en && !en.value.trim()) en.value = translit(inp.value); }));
+    const bindName = inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const en = el.querySelector('[data-f=name_en]'); if (en && !en.value.trim()) en.value = translit(inp.value); });
+    root.querySelectorAll('[data-f=name]').forEach(bindName);
     const count = () => { let ok = 0; cardEls().forEach(el => { const d = isDone(el); el.classList.toggle('ok', !!d); el.classList.toggle('part', !d && !isEmpty(el)); el.querySelector('[data-cst]').textContent = d ? 'مكتمل' : isEmpty(el) ? 'فاضي' : 'ناقص'; if (d) ok++; }); $('cn_count').textContent = `مكتمل ${ok} من ${cardEls().length}`; };
     root.addEventListener('input', count); root.addEventListener('change', e => { const p = e.target.closest('[data-plat]'); if (p) { const el = p.closest('[data-card]'); const k = readPlats(el, 'c' + el.dataset.card); el.querySelectorAll('[data-for]').forEach(x => x.hidden = !k.includes(x.dataset.for)); } count(); });
-    root.querySelectorAll('[data-f=url]').forEach(inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const dup = dupInfl(handleOf(inp.value), inp.value); if (dup.length && !el.dataset.infl) { const i = dup[0]; el.dataset.infl = i.id; const set = (k, v) => { const x = el.querySelector(`[data-f="${k}"]`); if (x && !x.value && v) x.value = v; }; set('name', i.name); set('acc_type', i.acc_type); set('phone', i.phone); set('city', i.city); set('district', i.district); set('country', i.country); set('sn_user', i.snap_user); set('ig_user', i.ig_user); set('name_en', i.name_en); if (i.price_after != null) set('price', String(i.price_after)); if (i.price_before != null) set('price_before', String(i.price_before)); if (isContinuing(i)) el.querySelector('[data-f=status]').value = 'مستمر'; toast('الحساب موجود عندنا، سحبت بياناته'); count(); } else if (!dup.length) takenBy(handleOf(inp.value)).then(t => { let w = el.querySelector('[data-taken]'); if (!w) { w = document.createElement('div'); w.dataset.taken = '1'; w.className = 'dup'; el.querySelector('.hd').after(w); } w.hidden = !t; w.textContent = t ? takenMsg(t) : ''; }); }));
+    const bindUrl = inp => inp.addEventListener('change', () => { const el = inp.closest('[data-card]'); const dup = dupInfl(handleOf(inp.value), inp.value); if (dup.length && !el.dataset.infl) { const i = dup[0]; el.dataset.infl = i.id; const set = (k, v) => { const x = el.querySelector(`[data-f="${k}"]`); if (x && !x.value && v) x.value = v; }; set('name', i.name); set('acc_type', i.acc_type); set('phone', i.phone); set('city', i.city); set('district', i.district); set('country', i.country); set('sn_user', i.snap_user); set('ig_user', i.ig_user); set('name_en', i.name_en); if (i.price_after != null) set('price', String(i.price_after)); if (i.price_before != null) set('price_before', String(i.price_before)); if (isContinuing(i)) el.querySelector('[data-f=status]').value = 'مستمر'; toast('الحساب موجود عندنا، سحبت بياناته'); count(); } else if (!dup.length) takenBy(handleOf(inp.value)).then(t => { let w = el.querySelector('[data-taken]'); if (!w) { w = document.createElement('div'); w.dataset.taken = '1'; w.className = 'dup'; el.querySelector('.hd').after(w); } w.hidden = !t; w.textContent = t ? takenMsg(t) : ''; }); });
+    root.querySelectorAll('[data-f=url]').forEach(bindUrl);
+    if ($('cn_add')) $('cn_add').onclick = () => { const step = Math.min(free - shownBlank, 5); if (step <= 0) return;
+      const box = $('cn_cards'); for (let k = 0; k < step; k++) { const t = document.createElement('div'); t.innerHTML = nomCard(++n, null, null); const el = t.firstElementChild; box.appendChild(el); el.querySelectorAll('[data-f=name]').forEach(bindName); el.querySelectorAll('[data-f=url]').forEach(bindUrl); }
+      shownBlank += step; const left = free - shownBlank; if (left <= 0) $('cn_add').closest('.row').remove(); else if (free !== Infinity) $('cn_left').textContent = `باقي ${left} بطاقة في حصتك`; count(); box.lastElementChild.scrollIntoView({ block: 'nearest' }); };
     root.addEventListener('click', async e => { const rm = e.target.closest('[data-rm]'); if (!rm) return; const el = rm.closest('[data-card]'); if (!await confirmBox('تحذف هذا الترشيح؟')) return; const r = await q(sb.from('deals').update({ closed_at: nowIso(), closed_reason: 'حذفه الموظف قبل الإرسال' }).eq('id', el.dataset.deal).select().single()); if (r) { upsertLocal(S.deals, r); openCampNom(cid); } });
     count();
     $('cn_more').onclick = () => requestQuota(cid);
@@ -1426,7 +1436,7 @@ async function openReq(id) {
       if (k === 'cancel') { if (!await confirmBox('تلغي هذا الطلب؟')) return fail(); return (await reqAct(r, { status: 'cancelled' }, 'cancel', '')) ? done('انلغى الطلب') : fail(); }
       if (k === 'qok') { const { data: g, error } = await sb.rpc('quota_grant_b', { p_campaign: r.campaign_id, p_member: r.from_member, p_qty: r.qty || 0, p_budget: Number(r.qty_budget) || 0 }); if (error || !g) { toast(friendly(error || 'ما نفعت'), true); return fail(); }
         const newq = g.quota; const kq = S.quotas.findIndex(y => y.campaign_id === r.campaign_id && y.member_id === r.from_member); if (kq >= 0) { S.quotas[kq].quota = newq; S.quotas[kq].quota_budget = g.quota_budget; } else S.quotas.push({ campaign_id: r.campaign_id, member_id: r.from_member, quota: newq, quota_budget: g.quota_budget });
-        const cc = camp(r.campaign_id); if (cc && cc.target_total != null) cc.target_total += (r.qty || 0); if (cc && cc.budget != null && Number(r.qty_budget)) cc.budget = Number(cc.budget) + Number(r.qty_budget);
+        const cc = camp(r.campaign_id); if (cc && cc.target_total != null) cc.target_total += (r.qty || 0); if (cc && cc.budget != null && Number(r.qty_budget) && isAdmin()) cc.budget = Number(cc.budget) + Number(r.qty_budget);
         return (await reqAct(r, { status: 'done', done_at: nowIso() }, 'quota_ok', `الحصة صارت ${newq}، والعدد المطلوب للحملة زاد بنفس المقدار`)) ? done('زادت الحصة وزاد العدد المطلوب للحملة') : fail(); }
       if (k === 'qno') { const why = await reasonBox('سبب الرفض', false); if (why == null) return fail(); return (await reqAct(r, { status: 'cancelled' }, 'quota_no', why.trim())) ? done('انرفض الطلب') : fail(); }
     });

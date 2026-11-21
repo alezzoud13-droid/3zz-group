@@ -67,25 +67,49 @@ drop trigger if exists guard_member_budget on public.deals;
 create trigger guard_member_budget before insert or update on public.deals for each row execute function public.guard_member_budget();
 
 -- ============ 3) اعتماد طلب الزيادة: عدد و/أو مبلغ في عملية وحدة ============
+-- نفس قواعد quota_grant القديمة (قرار 22): المعتمد يعتمد طلب مفتوح من الموظف بنفس العدد والمبلغ فقط،
+-- والطلب ينقفل في نفس العملية. زيادة العدد ترفع «العدد المطلوب» للحملة زي قبل.
+-- زيادة المبلغ: ما ترفع سقف صرف الحملة إلا من عبدالمحسن (قرار 24) — المعتمد يوزّع من داخل السقف بس.
 create or replace function public.quota_grant_b(p_campaign uuid, p_member uuid, p_qty int, p_budget numeric) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare newq int; newb numeric;
+declare newq int; newb numeric; v_req uuid; adm boolean := public.is_admin();
 begin
   p_qty := coalesce(p_qty, 0); p_budget := coalesce(p_budget, 0);
   if p_qty < 0 or p_budget < 0 then raise exception 'قيمة الزيادة غير صحيحة'; end if;
   if p_qty = 0 and p_budget = 0 then raise exception 'حدد عدد الترشيحات أو مبلغ الزيادة'; end if;
-  if not (public.is_admin() or public.has_role('approver')) then raise exception 'اعتماد زيادة الحصص لمتعب أو عبدالمحسن فقط'; end if;
-  if p_member = auth.uid() and not public.is_admin() then raise exception 'زيادة حصتك يعتمدها عبدالمحسن، مو أنت'; end if;
+  if not (adm or public.has_role('approver')) then raise exception 'اعتماد زيادة الحصص لمتعب أو عبدالمحسن فقط'; end if;
+  if p_member = auth.uid() and not adm then raise exception 'زيادة حصتك يعتمدها عبدالمحسن، مو أنت'; end if;
+  select id into v_req from requests where kind = 'quota' and campaign_id = p_campaign and from_member = p_member
+    and status not in ('done','cancelled') and coalesce(qty, 0) = p_qty and coalesce(qty_budget, 0) = p_budget
+    order by created_at limit 1 for update;
+  if v_req is null and not adm then raise exception 'ما فيه طلب زيادة مفتوح من الموظف بهذا العدد والمبلغ'; end if;
+  perform set_config('app.quota', 'on', true);
   if p_qty > 0 then update campaigns set target_total = target_total + p_qty where id = p_campaign and target_total is not null; end if;
-  if p_budget > 0 then update campaigns set budget = budget + p_budget where id = p_campaign and budget is not null; end if;
+  if p_budget > 0 and adm then update campaigns set budget = budget + p_budget where id = p_campaign and budget is not null; end if;
   insert into quotas (campaign_id, member_id, quota, quota_budget, updated_by)
     values (p_campaign, p_member, p_qty, nullif(p_budget, 0), auth.uid())
     on conflict (campaign_id, member_id) do update
       set quota = quotas.quota + p_qty,
           quota_budget = case when p_budget > 0 then coalesce(quotas.quota_budget, 0) + p_budget else quotas.quota_budget end,
           updated_by = auth.uid(), updated_at = now();
+  if v_req is not null then update requests set status = 'done', done_at = now() where id = v_req; end if;
+  perform set_config('app.quota', 'off', true);
   select quota, quota_budget into newq, newb from quotas where campaign_id = p_campaign and member_id = p_member;
   return jsonb_build_object('quota', newq, 'quota_budget', newb);
 end $$;
 revoke all on function public.quota_grant_b(uuid, uuid, int, numeric) from public, anon;
 grant execute on function public.quota_grant_b(uuid, uuid, int, numeric) to authenticated;
+
+-- ============ 4) مبلغ طلب الزيادة يثبت بعد الإرسال (قرار 35) ============
+create or replace function public.guard_request_budget() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(new.qty_budget, 0) < 0 then raise exception 'مبلغ الزيادة غير صحيح'; end if;
+  if tg_op = 'UPDATE' and new.qty_budget is distinct from old.qty_budget
+     and not public.is_admin() and coalesce(current_setting('app.quota', true), '') <> 'on' then
+    raise exception 'الطلب بعد إرساله ما يتعدل — ألغه وأنشئ طلباً جديداً';
+  end if;
+  return new;
+end $$;
+drop trigger if exists a1_guard_request_budget on public.requests;
+create trigger a1_guard_request_budget before insert or update on public.requests for each row execute function public.guard_request_budget();

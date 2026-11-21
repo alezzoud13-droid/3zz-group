@@ -1,5 +1,5 @@
 {
-  "meta": {"harness":"22cb2470573e","frozenNow":"2026-11-11T08:00:00.000Z","note":"recorded by smoke.js --update; the per-scenario writes/exports are the contract, render summaries are informational"},
+  "meta": {"harness":"4f1d20e62c1b","frozenNow":"2026-11-11T08:00:00.000Z","note":"recorded by smoke.js --update; the per-scenario writes/exports are the contract, render summaries are informational"},
   "render": {
     "render:admin#mine": {"ids":{"mineAs":{"kids":10},"mineBody":{"kids":12,"button":25,"field":9}},"data":{"data-mf":3,"data-top":1,"data-open":9,"data-g":7,"data-openinfl":1,"data-more":3,"data-all":3,"data-dobulk":3,"data-bulk":6,"data-ap1":1,"data-dq":2,"data-id":2,"data-req":2,"data-payx":1},"groups":["members=0","acq_review=1","appr=1","quota_req=2","draft=1","pay=3","pay_go=2"],"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
     "render:admin#acq": {"ids":{"aSt":{"kids":8},"aMem":{"kids":10},"aType":{"kids":8},"aList":{"kids":1,"tr":43,"table":1}},"data":{"data-openinfl":42},"shell":{"tabs":["mine","acq","camps","pipe","req","today","dash","setup"],"mineCnt":"11","reqCnt":""}},
@@ -285,7 +285,7 @@
     },
     "creator_quota_request": {
       "writes": [
-        {"table":"requests","op":"insert","match":null,"payload":{"campaign_id":"@camp.alpha","details":"عندي ثلاث حسابات جاهزة","from_member":"@member.creator","kind":"quota","qty":3,"title":"زيادة 3 ترشيح في حملة حملة ألف","to_member":"@member.approver"}}
+        {"table":"requests","op":"insert","match":null,"payload":{"campaign_id":"@camp.alpha","details":"عندي ثلاث حسابات جاهزة","from_member":"@member.creator","kind":"quota","qty":3,"qty_budget":null,"title":"زيادة 3 ترشيح في حملة حملة ألف","to_member":"@member.approver"}}
       ],
       "exports": [
       ]
@@ -422,7 +422,7 @@
     "approver_quota_request_approve": {
       "writes": [
         {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.approver","request_id":"@req.quota","seen_at":"<ts>"}},
-        {"table":"quota_grant","op":"rpc","match":null,"payload":{"p_campaign":"@camp.beta","p_member":"@member.creator","p_qty":2}},
+        {"table":"quota_grant_b","op":"rpc","match":null,"payload":{"p_budget":0,"p_campaign":"@camp.beta","p_member":"@member.creator","p_qty":2}},
         {"table":"requests","op":"update","match":{"id":"@req.quota"},"payload":{"done_at":"<ts>","status":"done"}},
         {"table":"request_events","op":"insert","match":null,"payload":{"body":"الحصة صارت 5، والعدد المطلوب للحملة زاد بنفس المقدار","member_id":"@member.approver","request_id":"@req.quota","type":"quota_ok"}},
         {"table":"request_reads","op":"upsert","match":null,"payload":{"member_id":"@member.approver","request_id":"@req.quota","seen_at":"<ts>"}},
@@ -452,15 +452,15 @@
     },
     "admin_quotas_save": {
       "writes": [
-        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.beta","member_id":"@member.creator","quota":4,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.creator2","quota":5,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.approver","quota":0,"updated_by":"@member.admin"}]},
-        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.beta","member_id":"@member.creator","quota":4,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.creator2","quota":3,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.approver","quota":3,"updated_by":"@member.admin"}]}
+        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.beta","member_id":"@member.creator","quota":4,"quota_budget":null,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.creator2","quota":5,"quota_budget":null,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.approver","quota":0,"quota_budget":null,"updated_by":"@member.admin"}]},
+        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.beta","member_id":"@member.creator","quota":4,"quota_budget":null,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.creator2","quota":3,"quota_budget":null,"updated_by":"@member.admin"},{"campaign_id":"@camp.beta","member_id":"@member.approver","quota":3,"quota_budget":null,"updated_by":"@member.admin"}]}
       ],
       "exports": [
       ]
     },
     "approver_quotas_save": {
       "writes": [
-        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.alpha","member_id":"@member.creator","quota":17,"updated_by":"@member.approver"},{"campaign_id":"@camp.alpha","member_id":"@member.creator2","quota":8,"updated_by":"@member.approver"}]}
+        {"table":"quotas","op":"upsert","match":null,"payload":[{"campaign_id":"@camp.alpha","member_id":"@member.creator","quota":17,"quota_budget":null,"updated_by":"@member.approver"},{"campaign_id":"@camp.alpha","member_id":"@member.creator2","quota":8,"quota_budget":null,"updated_by":"@member.approver"}]}
       ],
       "exports": [
       ]
